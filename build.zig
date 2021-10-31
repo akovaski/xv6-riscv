@@ -55,6 +55,16 @@ pub fn build(b: *std.build.Builder) void {
     exe.setBuildMode(mode);
     exe.install();
 
+    const mkfs = b.step("mkfs", "Build mkfs executable");
+    const build_mkfs = b.addExecutable("mkfs", null);
+    build_mkfs.setOutputDir("mkfs");
+    build_mkfs.addIncludeDir(".");
+    build_mkfs.addCSourceFile("mkfs/mkfs.c", cflags);
+    build_mkfs.setBuildMode(.Debug);
+    build_mkfs.linkLibC();
+    build_mkfs.setTarget(b.standardTargetOptions(.{}));
+    mkfs.dependOn(&build_mkfs.step);
+
     const UPROGS = [_][]const u8{
         "user/_cat",
         "user/_echo",
@@ -74,12 +84,8 @@ pub fn build(b: *std.build.Builder) void {
         "user/_zombie",
     };
     const fs_img = b.step("fs.img", "Create fs.img");
-    var fs_img_args = &[_][]const u8{
-        "./mkfs/mkfs",
-        "fs.img",
-        "README",
-    } ++ UPROGS;
-    const build_fs_img = b.addSystemCommand(fs_img_args);
+    var build_fs_img = build_mkfs.run();
+    build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" } ++ UPROGS);
     fs_img.dependOn(&build_fs_img.step);
     build_fs_img.step.dependOn(&exe.step);
 
