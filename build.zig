@@ -5,6 +5,8 @@ pub fn build(b: *std.build.Builder) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     //const mode = b.standardReleaseOptions();
+
+    // Debug and ReleaseSafe don't seem to work well with xv6
     const mode = std.builtin.Mode.ReleaseSmall;
 
     const target = std.zig.CrossTarget{
@@ -13,48 +15,15 @@ pub fn build(b: *std.build.Builder) void {
         .abi = .none,
     };
 
-    const entry = b.step("entry", "build entry.o");
-    var build_entry = b.addAssemble("entry", "kernel/entry.S");
-    build_entry.setTarget(target);
-    build_entry.setBuildMode(mode);
-    entry.dependOn(&build_entry.step);
-
-    const vm = b.step("vm", "build vm.o");
-    var vm_args = &[_][]const u8{
-        "clang-13", "--target=riscv64-unknown-elf",
-        "-mno-relax", "-march=rv64imafdc", "-c",
-        "-Wall", "-Werror", "-O", "-fno-omit-frame-pointer",
-        "-ggdb", "-MD", "-mcmodel=medany", "-ffreestanding",
-        "-fno-common", "-nostdlib", "-I.", "-fno-stack-protector",
-        "-o", "kernel/vm.o", "kernel/vm.c",
-    };
-    const build_vm = b.addSystemCommand(vm_args);
-    vm.dependOn(&build_vm.step);
-
-    const trap = b.step("trap", "build trap.o");
-    var trap_args = &[_][]const u8{
-        "clang-13", "--target=riscv64-unknown-elf",
-        "-mno-relax", "-march=rv64imafdc", "-c",
-        "-Wall", "-Werror", "-O", "-fno-omit-frame-pointer",
-        "-ggdb", "-MD", "-mcmodel=medany", "-ffreestanding",
-        "-fno-common", "-nostdlib", "-I.", "-fno-stack-protector",
-        "-o", "kernel/trap.o", "kernel/trap.c",
-    };
-    const build_trap = b.addSystemCommand(trap_args);
-    trap.dependOn(&build_trap.step);
-
     const exe = b.addExecutable("kernel", null);
-    exe.step.dependOn(&build_vm.step);
-    exe.step.dependOn(&build_trap.step);
-
     exe.setOutputDir("kernel");
 
     exe.setLinkerScriptPath(.{ .path = "kernel/kernel.ld" });
     const cflags = &[_][]const u8{
-        "-Wall","-Werror","-Os","-fno-omit-frame-pointer","-ggdb","-MD",
+        "-Wall","-Werror","-fno-omit-frame-pointer","-ggdb","-MD",
         "-mcmodel=medany","-ffreestanding","-fno-common","-nostdlib","-mno-relax",
-        "-I.","-fno-stack-protector","-fno-pie","-march=rv64imafdc","-mabi=lp64d"};
-    exe.addObject(build_entry);
+        "-I.","-fno-pie","-march=rv64imafdc","-mabi=lp64d"};
+    exe.addAssemblyFile("kernel/entry.S");
     exe.addCSourceFile("kernel/start.c", cflags);
     exe.addCSourceFile("kernel/console.c", cflags);
     exe.addCSourceFile("kernel/printf.c", cflags);
@@ -63,11 +32,11 @@ pub fn build(b: *std.build.Builder) void {
     exe.addCSourceFile("kernel/spinlock.c", cflags);
     exe.addCSourceFile("kernel/string.c", cflags);
     exe.addCSourceFile("kernel/main.c", cflags);
-    exe.addObjectFile("kernel/vm.o");
+    exe.addCSourceFile("kernel/vm.c", cflags);
     exe.addCSourceFile("kernel/proc.c", cflags);
     exe.addAssemblyFile("kernel/swtch.S");
     exe.addAssemblyFile("kernel/trampoline.S");
-    exe.addObjectFile("kernel/trap.o");
+    exe.addCSourceFile("kernel/trap.c", cflags);
     exe.addCSourceFile("kernel/syscall.c", cflags);
     exe.addCSourceFile("kernel/sysproc.c", cflags);
     exe.addCSourceFile("kernel/bio.c", cflags);
