@@ -1,34 +1,34 @@
 K=kernel
 U=user
 
-OBJS = \
-  $K/entry.o \
-  $K/start.o \
-  $K/console.o \
-  $K/printf.o \
-  $K/uart.o \
-  $K/kalloc.o \
-  $K/spinlock.o \
-  $K/string.o \
-  $K/main.o \
-  $K/vm.o \
-  $K/proc.o \
-  $K/swtch.o \
-  $K/trampoline.o \
-  $K/trap.o \
-  $K/syscall.o \
-  $K/sysproc.o \
-  $K/bio.o \
-  $K/fs.o \
-  $K/log.o \
-  $K/sleeplock.o \
-  $K/file.o \
-  $K/pipe.o \
-  $K/exec.o \
-  $K/sysfile.o \
-  $K/kernelvec.o \
-  $K/plic.o \
-  $K/virtio_disk.o
+KERNEL_SRC = \
+  $K/entry.S \
+  $K/start.c \
+  $K/console.c \
+  $K/printf.c \
+  $K/uart.c \
+  $K/kalloc.c \
+  $K/spinlock.c \
+  $K/string.c \
+  $K/main.c \
+  $K/vm.c \
+  $K/proc.c \
+  $K/swtch.S \
+  $K/trampoline.S \
+  $K/trap.c \
+  $K/syscall.c \
+  $K/sysproc.c \
+  $K/bio.c \
+  $K/fs.c \
+  $K/log.c \
+  $K/sleeplock.c \
+  $K/file.c \
+  $K/pipe.c \
+  $K/exec.c \
+  $K/sysfile.c \
+  $K/kernelvec.S \
+  $K/plic.c \
+  $K/virtio_disk.c
 
 QEMU = qemu-system-riscv64
 
@@ -55,14 +55,14 @@ endif
 
 LDFLAGS = -z max-page-size=4096
 
-$K/kernel: $(OBJS) $K/kernel.ld
+$K/kernel: $(KERNEL_SRC) $K/kernel.ld build.zig
 	#$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS)
 	zig build
 	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
 	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
 
-tags: $(OBJS) _init
-	etags *.S *.c
+tags: $(KERNEL_SRC)
+	etags $(KERNEL_SRC)
 
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
@@ -122,6 +122,7 @@ clean:
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	$(UPROGS)
+	rm -rf zig-out
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)
