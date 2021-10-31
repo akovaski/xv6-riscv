@@ -5,19 +5,18 @@ pub fn build(b: *std.build.Builder) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     //const mode = b.standardReleaseOptions();
+    const mode = std.builtin.Mode.ReleaseSmall;
+
     const target = std.zig.CrossTarget{
         .cpu_arch = .riscv64,
         .os_tag = .freestanding,
         .abi = .none,
     };
+
     const entry = b.step("entry", "build entry.o");
-    //const build_entry = b.addObject("entry.o", null);
-    var entry_args = &[_][]const u8{
-        "clang-13", "--target=riscv64-unknown-elf",
-        "-mno-relax", "-march=rv64imafdc", "-c",
-        "-o", "kernel/entry.o", "kernel/entry.S",
-    };
-    const build_entry = b.addSystemCommand(entry_args);
+    var build_entry = b.addAssemble("entry", "kernel/entry.S");
+    build_entry.setTarget(target);
+    build_entry.setBuildMode(mode);
     entry.dependOn(&build_entry.step);
 
     const vm = b.step("vm", "build vm.o");
@@ -45,7 +44,6 @@ pub fn build(b: *std.build.Builder) void {
     trap.dependOn(&build_trap.step);
 
     const exe = b.addExecutable("kernel", null);
-    exe.step.dependOn(&build_entry.step);
     exe.step.dependOn(&build_vm.step);
     exe.step.dependOn(&build_trap.step);
 
@@ -56,8 +54,7 @@ pub fn build(b: *std.build.Builder) void {
         "-Wall","-Werror","-Os","-fno-omit-frame-pointer","-ggdb","-MD",
         "-mcmodel=medany","-ffreestanding","-fno-common","-nostdlib","-mno-relax",
         "-I.","-fno-stack-protector","-fno-pie","-march=rv64imafdc","-mabi=lp64d"};
-    exe.addObjectFile("kernel/entry.o");
-    //exe.addAssemblyFile("kernel/entry.S");
+    exe.addObject(build_entry);
     exe.addCSourceFile("kernel/start.c", cflags);
     exe.addCSourceFile("kernel/console.c", cflags);
     exe.addCSourceFile("kernel/printf.c", cflags);
@@ -85,7 +82,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.addCSourceFile("kernel/plic.c", cflags);
     exe.addCSourceFile("kernel/virtio_disk.c", cflags);
     exe.setTarget(target);
-    exe.setBuildMode(.Debug); // other build modes currently don't properly compile C files
+    exe.setBuildMode(mode);
     exe.install();
 
     const qemu = b.step("qemu", "Run the OS in qemu");
