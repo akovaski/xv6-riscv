@@ -55,6 +55,34 @@ pub fn build(b: *std.build.Builder) void {
     exe.setBuildMode(mode);
     exe.install();
 
+    const UPROGS = [_][]const u8{
+        "user/_cat",
+        "user/_echo",
+        "user/_forktest",
+        "user/_grep",
+        "user/_init",
+        "user/_kill",
+        "user/_ln",
+        "user/_ls",
+        "user/_mkdir",
+        "user/_rm",
+        "user/_sh",
+        "user/_stressfs",
+        "user/_usertests",
+        "user/_grind",
+        "user/_wc",
+        "user/_zombie",
+    };
+    const fs_img = b.step("fs.img", "Create fs.img");
+    var fs_img_args = &[_][]const u8{
+        "./mkfs/mkfs",
+        "fs.img",
+        "README",
+    } ++ UPROGS;
+    const build_fs_img = b.addSystemCommand(fs_img_args);
+    fs_img.dependOn(&build_fs_img.step);
+    build_fs_img.step.dependOn(&exe.step);
+
     const qemu = b.step("qemu", "Run the OS in qemu");
     var qemu_args = &[_][]const u8{
         "qemu-system-x86_64",

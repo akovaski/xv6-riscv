@@ -111,7 +111,7 @@ UPROGS=\
 	$U/_zombie\
 
 fs.img: mkfs/mkfs README $(UPROGS)
-	mkfs/mkfs fs.img README $(UPROGS)
+	zig build fs.img
 
 -include kernel/*.d user/*.d
 
