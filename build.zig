@@ -19,10 +19,8 @@ pub fn build(b: *std.build.Builder) void {
     exe.setOutputDir("kernel");
 
     exe.setLinkerScriptPath(.{ .path = "kernel/kernel.ld" });
-    const cflags = &[_][]const u8{
-        "-Wall","-Werror","-fno-omit-frame-pointer","-ggdb","-MD",
-        "-mcmodel=medany","-ffreestanding","-fno-common","-nostdlib","-mno-relax",
-        "-I.","-fno-pie","-march=rv64imafdc","-mabi=lp64d"};
+    const cflags = &[_][]const u8{ "-Wall", "-Werror" };
+    exe.addIncludeDir(".");
     exe.addAssemblyFile("kernel/entry.S");
     exe.addCSourceFile("kernel/start.c", cflags);
     exe.addCSourceFile("kernel/console.c", cflags);
@@ -51,6 +49,9 @@ pub fn build(b: *std.build.Builder) void {
     exe.addCSourceFile("kernel/plic.c", cflags);
     exe.addCSourceFile("kernel/virtio_disk.c", cflags);
     exe.setTarget(target);
+    exe.target_abi = .lp64d;
+    exe.code_model = .medium;
+    exe.pie = false;
     exe.setBuildMode(mode);
     exe.install();
 
