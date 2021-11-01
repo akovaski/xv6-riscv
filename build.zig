@@ -81,6 +81,10 @@ pub fn build(b: *std.build.Builder) void {
     const build_rm = buildUserExec(b, target, mode, cflags, "rm", "rm.c");
     const build_sh = buildUserExec(b, target, mode, cflags, "sh", "sh.c");
     const build_stressfs = buildUserExec(b, target, mode, cflags, "stressfs", "stressfs.c");
+    const build_usertests = buildUserExec(b, target, mode, cflags, "usertests", "usertests.c");
+    const build_grind = buildUserExec(b, target, mode, cflags, "grind", "grind.c");
+    const build_wc = buildUserExec(b, target, mode, cflags, "wc", "wc.c");
+    const build_zombie = buildUserExec(b, target, mode, cflags, "zombie", "zombie.c");
 
     const UPROGS = [_][]const u8{
         //"user/_cat",
@@ -95,10 +99,10 @@ pub fn build(b: *std.build.Builder) void {
         //"user/_rm",
         //"user/_sh",
         //"user/_stressfs",
-        "user/_usertests",
-        "user/_grind",
-        "user/_wc",
-        "user/_zombie",
+        //"user/_usertests",
+        //"user/_grind",
+        //"user/_wc",
+        //"user/_zombie",
     };
     var build_fs_img = build_mkfs.run();
     build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" });
@@ -113,6 +117,10 @@ pub fn build(b: *std.build.Builder) void {
     build_fs_img.addFileSourceArg(build_rm.getOutputSource());
     build_fs_img.addFileSourceArg(build_sh.getOutputSource());
     build_fs_img.addFileSourceArg(build_stressfs.getOutputSource());
+    build_fs_img.addFileSourceArg(build_usertests.getOutputSource());
+    build_fs_img.addFileSourceArg(build_grind.getOutputSource());
+    build_fs_img.addFileSourceArg(build_wc.getOutputSource());
+    build_fs_img.addFileSourceArg(build_zombie.getOutputSource());
     build_fs_img.addArgs(&UPROGS);
 
     const fs_img = b.step("fs.img", "Create fs.img");

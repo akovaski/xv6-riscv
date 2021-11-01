@@ -91,10 +91,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 
 UPROGS=\
 	$U/_init\
-	$U/_usertests\
-	$U/_grind\
-	$U/_wc\
-	$U/_zombie\
 
 fs.img: README $(UPROGS)
 	zig build fs.img
