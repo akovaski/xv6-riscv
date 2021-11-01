@@ -69,22 +69,32 @@ pub fn build(b: *std.build.Builder) void {
     const mkfs = b.step("mkfs", "Build mkfs executable");
     mkfs.dependOn(&build_mkfs.step);
 
-    const build_cat = buildUserExec(b, target, mode, cflags, "cat");
-    const build_echo = buildUserExec(b, target, mode, cflags, "echo");
-    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest");
-    const build_grep = buildUserExec(b, target, mode, cflags, "grep");
-    const build_init = buildUserExec(b, target, mode, cflags, "init");
-    const build_kill = buildUserExec(b, target, mode, cflags, "kill");
-    const build_ln = buildUserExec(b, target, mode, cflags, "ln");
-    const build_ls = buildUserExec(b, target, mode, cflags, "ls");
-    const build_mkdir = buildUserExec(b, target, mode, cflags, "mkdir");
-    const build_rm = buildUserExec(b, target, mode, cflags, "rm");
-    const build_sh = buildUserExec(b, target, mode, cflags, "sh");
-    const build_stressfs = buildUserExec(b, target, mode, cflags, "stressfs");
-    const build_usertests = buildUserExec(b, target, mode, cflags, "usertests");
-    const build_grind = buildUserExec(b, target, mode, cflags, "grind");
-    const build_wc = buildUserExec(b, target, mode, cflags, "wc");
-    const build_zombie = buildUserExec(b, target, mode, cflags, "zombie");
+    const build_ulib: *std.build.LibExeObjStep = buildUserLib(b, target, mode, cflags, "ulib");
+    const build_usys = buildUsys(b, target, mode);
+    const build_printf = buildUserLib(b, target, mode, cflags, "printf");
+    const build_umalloc = buildUserLib(b, target, mode, cflags, "umalloc");
+    const ulib: []*std.build.LibExeObjStep = &[_]*std.build.LibExeObjStep{ build_ulib, build_usys, build_printf, build_umalloc };
+
+    var build_cat = buildUserExec(b, target, mode, cflags, "cat", ulib);
+    build_cat.step.dependOn(&build_ulib.step);
+    build_cat.step.dependOn(&build_usys.step);
+    build_cat.step.dependOn(&build_printf.step);
+    build_cat.step.dependOn(&build_umalloc.step);
+    const build_echo = buildUserExec(b, target, mode, cflags, "echo", ulib);
+    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest", &[2]*std.build.LibExeObjStep{ build_ulib, build_usys });
+    const build_grep = buildUserExec(b, target, mode, cflags, "grep", ulib);
+    const build_init = buildUserExec(b, target, mode, cflags, "init", ulib);
+    const build_kill = buildUserExec(b, target, mode, cflags, "kill", ulib);
+    const build_ln = buildUserExec(b, target, mode, cflags, "ln", ulib);
+    const build_ls = buildUserExec(b, target, mode, cflags, "ls", ulib);
+    const build_mkdir = buildUserExec(b, target, mode, cflags, "mkdir", ulib);
+    const build_rm = buildUserExec(b, target, mode, cflags, "rm", ulib);
+    const build_sh = buildUserExec(b, target, mode, cflags, "sh", ulib);
+    const build_stressfs = buildUserExec(b, target, mode, cflags, "stressfs", ulib);
+    const build_usertests = buildUserExec(b, target, mode, cflags, "usertests", ulib);
+    const build_grind = buildUserExec(b, target, mode, cflags, "grind", ulib);
+    const build_wc = buildUserExec(b, target, mode, cflags, "wc", ulib);
+    const build_zombie = buildUserExec(b, target, mode, cflags, "zombie", ulib);
 
     var build_fs_img = build_mkfs.run();
     build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" });
@@ -128,16 +138,55 @@ pub fn build(b: *std.build.Builder) void {
     qemu.dependOn(&run_qemu.step);
 }
 
-fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, cflags: []const []const u8, comptime name: []const u8) *std.build.LibExeObjStep {
+fn buildUserLib(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, cflags: []const []const u8, comptime name: []const u8) *std.build.LibExeObjStep {
+    const build_user_lib = b.addObject(name, null);
+    build_user_lib.setOutputDir("user");
+    build_user_lib.addIncludeDir(".");
+    build_user_lib.addCSourceFile("user/" ++ name ++ ".c", cflags);
+    build_user_lib.setTarget(target);
+    build_user_lib.target_abi = .lp64d;
+    build_user_lib.code_model = .medium;
+    build_user_lib.setBuildMode(mode);
+
+    const user_exec = b.step(name, "Build xv6 " ++ name ++ " user library");
+    user_exec.dependOn(&build_user_lib.step);
+
+    return build_user_lib;
+}
+fn buildUsys(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode) *std.build.LibExeObjStep {
+    const usys_pl_src = std.build.FileSource{ .path = "user/usys.pl" };
+    const build_usys_s = b.addSystemCommand(&[_][]const u8{"perl"});
+    build_usys_s.addFileSourceArg(usys_pl_src);
+    build_usys_s.addArg("user/usys.S");
+
+    const usys_s = b.step("usys.S", "Build usys.S file");
+    usys_s.dependOn(&build_usys_s.step);
+
+    const build_usys = b.addObject("usys", null);
+    build_usys.setOutputDir("user");
+    build_usys.addIncludeDir(".");
+    build_usys.addAssemblyFile("user/usys.S");
+    build_usys.setTarget(target);
+    build_usys.target_abi = .lp64d;
+    build_usys.code_model = .medium;
+    build_usys.setBuildMode(mode);
+    build_usys.step.dependOn(&build_usys_s.step);
+
+    const usys = b.step("usys", "Build xv6 usys user library");
+    usys.dependOn(&build_usys.step);
+
+    return build_usys;
+}
+
+fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, cflags: []const []const u8, comptime name: []const u8, ulib: []*std.build.LibExeObjStep) *std.build.LibExeObjStep {
     const build_user_exec = b.addExecutable("_" ++ name, null);
     build_user_exec.setOutputDir("user");
     build_user_exec.setLinkerScriptPath(.{ .path = "user/user.ld" });
     build_user_exec.addIncludeDir(".");
     build_user_exec.addCSourceFile("user/" ++ name ++ ".c", cflags);
-    build_user_exec.addObjectFile("user/ulib.o");
-    build_user_exec.addObjectFile("user/usys.o");
-    build_user_exec.addObjectFile("user/printf.o");
-    build_user_exec.addObjectFile("user/umalloc.o");
+    for (ulib) |lib| {
+        build_user_exec.addObject(lib);
+    }
     build_user_exec.setTarget(target);
     build_user_exec.target_abi = .lp64d;
     build_user_exec.code_model = .medium;

@@ -1,4 +1,12 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
+
+use warnings;
+
+if ($#ARGV + 1 != 1) {
+    print STDERR "Must pass only one argument: destination usys.S file\n";
+    exit 1;
+}
+open STDOUT, '>', $ARGV[0] or die $!;
 
 # Generate usys.S, the stubs for syscalls.
 
