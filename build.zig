@@ -58,23 +58,10 @@ pub fn build(b: *std.build.Builder) void {
     kernel.dependOn(&build_kernel.step);
     b.default_step = kernel;
 
-    const build_cat = b.addExecutable("_cat", null);
-    build_cat.setOutputDir("user");
-    build_cat.setLinkerScriptPath(.{ .path = "user/user.ld" });
-    build_cat.addIncludeDir(".");
-    build_cat.addCSourceFile("user/cat.c", cflags);
-    build_cat.addObjectFile("user/ulib.o");
-    build_cat.addObjectFile("user/usys.o");
-    build_cat.addObjectFile("user/printf.o");
-    build_cat.addObjectFile("user/umalloc.o");
-    build_cat.setTarget(target);
-    build_cat.target_abi = .lp64d;
-    build_cat.code_model = .medium;
-    build_cat.pie = false;
-    build_cat.setBuildMode(mode);
-
-    const cat = b.step("cat", "Build xv6 cat user executable");
-    cat.dependOn(&build_cat.step);
+    const build_cat = buildUserExec(b, target, mode, cflags, "cat", "cat.c");
+    const build_echo = buildUserExec(b, target, mode, cflags, "echo", "echo.c");
+    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest", "forktest.c");
+    const build_grep = buildUserExec(b, target, mode, cflags, "grep", "grep.c");
 
     const build_mkfs = b.addExecutable("mkfs", null);
     build_mkfs.setOutputDir("mkfs");
@@ -109,21 +96,49 @@ pub fn build(b: *std.build.Builder) void {
     build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" } ++ UPROGS);
     build_fs_img.step.dependOn(&build_kernel.step);
     build_fs_img.step.dependOn(&build_cat.step);
+    build_fs_img.step.dependOn(&build_echo.step);
+    build_fs_img.step.dependOn(&build_forktest.step);
+    build_fs_img.step.dependOn(&build_grep.step);
 
     const fs_img = b.step("fs.img", "Create fs.img");
     fs_img.dependOn(&build_fs_img.step);
 
     const num_cpus = "3";
-    var qemu_args = &[_][]const u8{
-        "qemu-system-riscv64",
-        "-machine","virt","-bios","none","-kernel","kernel/kernel","-m","128M","-smp",num_cpus,"-nographic",
-        "-drive","file=fs.img,if=none,format=raw,id=x0",
-        "-device","virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0"
-    };
-    const run_qemu = b.addSystemCommand(qemu_args);
+    var qemu_args = [_][]const u8{"qemu-system-riscv64"} ++
+        [_][]const u8{ "-machine", "virt" } ++
+        [_][]const u8{ "-bios", "none" } ++
+        [_][]const u8{ "-kernel", "kernel/kernel" } ++
+        [_][]const u8{ "-m", "128M" } ++
+        [_][]const u8{ "-smp", num_cpus } ++
+        [_][]const u8{"-nographic"} ++
+        [_][]const u8{ "-drive", "file=fs.img,if=none,format=raw,id=x0" } ++
+        [_][]const u8{ "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0" };
+    const run_qemu = b.addSystemCommand(&qemu_args);
     run_qemu.step.dependOn(&build_kernel.step);
     run_qemu.step.dependOn(&build_fs_img.step);
 
     const qemu = b.step("qemu", "Run the OS in qemu");
     qemu.dependOn(&run_qemu.step);
+}
+
+pub fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, cflags: []const []const u8, comptime name: []const u8, comptime c_file: []const u8) *std.build.LibExeObjStep {
+    const build_user_exec = b.addExecutable("_" ++ name, null);
+    build_user_exec.setOutputDir("user");
+    build_user_exec.setLinkerScriptPath(.{ .path = "user/user.ld" });
+    build_user_exec.addIncludeDir(".");
+    build_user_exec.addCSourceFile("user/" ++ c_file, cflags);
+    build_user_exec.addObjectFile("user/ulib.o");
+    build_user_exec.addObjectFile("user/usys.o");
+    build_user_exec.addObjectFile("user/printf.o");
+    build_user_exec.addObjectFile("user/umalloc.o");
+    build_user_exec.setTarget(target);
+    build_user_exec.target_abi = .lp64d;
+    build_user_exec.code_model = .medium;
+    build_user_exec.pie = false;
+    build_user_exec.setBuildMode(mode);
+
+    const user_exec = b.step(name, "Build xv6 " ++ c_file ++ " user executable");
+    user_exec.dependOn(&build_user_exec.step);
+
+    return build_user_exec;
 }

@@ -90,9 +90,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 .PRECIOUS: %.o
 
 UPROGS=\
-	$U/_echo\
-	$U/_forktest\
-	$U/_grep\
 	$U/_init\
 	$U/_kill\
 	$U/_ln\
@@ -117,7 +114,7 @@ clean:
 	$K/kernel fs.img \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
-	$(UPROGS)
+	user/_*
 	rm -rf zig-cache zig-out
 
 # try to generate a unique GDB port
