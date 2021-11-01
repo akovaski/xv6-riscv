@@ -82,22 +82,23 @@ pub fn build(b: *std.build.Builder) void {
     const ulib: []*std.build.LibExeObjStep = &[_]*std.build.LibExeObjStep{ build_ulib, build_usys, build_printf, build_umalloc };
 
     var user_programs = [_]*std.build.LibExeObjStep{
-        buildUserExec(b, target, mode, cflags, "cat", ulib),
-        buildUserExec(b, target, mode, cflags, "echo", ulib),
-        buildUserExec(b, target, mode, cflags, "forktest", &[2]*std.build.LibExeObjStep{ build_ulib, build_usys }),
-        buildUserExec(b, target, mode, cflags, "grep", ulib),
-        buildUserExec(b, target, mode, cflags, "init", ulib),
-        buildUserExec(b, target, mode, cflags, "kill", ulib),
-        buildUserExec(b, target, mode, cflags, "ln", ulib),
-        buildUserExec(b, target, mode, cflags, "ls", ulib),
-        buildUserExec(b, target, mode, cflags, "mkdir", ulib),
-        buildUserExec(b, target, mode, cflags, "rm", ulib),
-        buildUserExec(b, target, mode, cflags, "sh", ulib),
-        buildUserExec(b, target, mode, cflags, "stressfs", ulib),
-        buildUserExec(b, target, mode, cflags, "usertests", ulib),
-        buildUserExec(b, target, mode, cflags, "grind", ulib),
-        buildUserExec(b, target, mode, cflags, "wc", ulib),
-        buildUserExec(b, target, mode, cflags, "zombie", ulib),
+        buildUserCExec(b, target, mode, cflags, "cat", ulib),
+        buildUserCExec(b, target, mode, cflags, "echo", ulib),
+        buildUserCExec(b, target, mode, cflags, "forktest", &[2]*std.build.LibExeObjStep{ build_ulib, build_usys }),
+        buildUserCExec(b, target, mode, cflags, "grep", ulib),
+        buildUserCExec(b, target, mode, cflags, "init", ulib),
+        buildUserCExec(b, target, mode, cflags, "kill", ulib),
+        buildUserCExec(b, target, mode, cflags, "ln", ulib),
+        buildUserCExec(b, target, mode, cflags, "ls", ulib),
+        buildUserCExec(b, target, mode, cflags, "mkdir", ulib),
+        buildUserCExec(b, target, mode, cflags, "rm", ulib),
+        buildUserCExec(b, target, mode, cflags, "sh", ulib),
+        buildUserCExec(b, target, mode, cflags, "stressfs", ulib),
+        buildUserCExec(b, target, mode, cflags, "usertests", ulib),
+        buildUserCExec(b, target, mode, cflags, "grind", ulib),
+        buildUserCExec(b, target, mode, cflags, "wc", ulib),
+        buildUserCExec(b, target, mode, cflags, "zombie", ulib),
+        buildUserZigExec(b, target, mode, "my_fork", ulib),
     };
 
     var build_fs_img = build_mkfs.run();
@@ -169,12 +170,41 @@ fn buildUsys(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.built
     return build_usys;
 }
 
-fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, cflags: []const []const u8, comptime name: []const u8, ulib: []*std.build.LibExeObjStep) *std.build.LibExeObjStep {
-    const build_user_exec = b.addExecutable("_" ++ name, null);
+fn buildUserCExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, comptime cflags: []const []const u8, comptime name: []const u8, ulib: []*std.build.LibExeObjStep) *std.build.LibExeObjStep {
+    return buildUserExec(b, target, mode, .{ .c = .{ .name = name, .cflags = cflags } }, ulib);
+}
+fn buildUserZigExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, comptime name: []const u8, ulib: []*std.build.LibExeObjStep) *std.build.LibExeObjStep {
+    return buildUserExec(b, target, mode, .{ .zig = .{ .name = name } }, ulib);
+}
+
+const UserExecSource = union(enum) {
+    c: struct {
+        name: []const u8,
+        cflags: []const []const u8,
+    },
+    zig: struct {
+        name: []const u8,
+    },
+
+    fn name(self: UserExecSource) []const u8 {
+        return switch (self) {
+            .c => |c| c.name,
+            .zig => |zig| zig.name,
+        };
+    }
+};
+fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.builtin.Mode, comptime source: UserExecSource, ulib: []*std.build.LibExeObjStep) *std.build.LibExeObjStep {
+    const build_user_exec = switch (source) {
+        .c => |c| blk: {
+            const bld = b.addExecutable("_" ++ c.name, null);
+            bld.addCSourceFile("user/" ++ c.name ++ ".c", c.cflags);
+            break :blk bld;
+        },
+        .zig => |zig| b.addExecutable("_" ++ zig.name, "user/" ++ zig.name ++ ".zig"),
+    };
     build_user_exec.setOutputDir("user");
     build_user_exec.setLinkerScriptPath(.{ .path = "user/user.ld" });
     build_user_exec.addIncludeDir(".");
-    build_user_exec.addCSourceFile("user/" ++ name ++ ".c", cflags);
     for (ulib) |lib| {
         build_user_exec.addObject(lib);
     }
@@ -184,10 +214,10 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     build_user_exec.pie = false;
     build_user_exec.setBuildMode(mode);
 
-    const user_exec = b.step("user/_" ++ name, "Build xv6 " ++ name ++ " user executable AND .asm,.sym files");
+    const user_exec = b.step("user/_" ++ source.name(), "Build xv6 " ++ source.name() ++ " user executable AND .asm,.sym files");
     user_exec.dependOn(&build_user_exec.step);
 
-    const create_syms = createSym(b, build_user_exec, "user/_" ++ name);
+    const create_syms = createSym(b, build_user_exec, "user/_" ++ source.name());
     for (create_syms) |create_sym| {
         user_exec.dependOn(&create_sym.step);
     }
