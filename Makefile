@@ -89,10 +89,7 @@ $U/_forktest: $U/forktest.o $(ULIB)
 # http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
 .PRECIOUS: %.o
 
-UPROGS=\
-	$U/_init\
-
-fs.img: README $(UPROGS)
+fs.img: $(ULIB)
 	zig build fs.img
 
 -include kernel/*.d user/*.d
