@@ -58,6 +58,24 @@ pub fn build(b: *std.build.Builder) void {
     kernel.dependOn(&build_kernel.step);
     b.default_step = kernel;
 
+    const build_cat = b.addExecutable("_cat", null);
+    build_cat.setOutputDir("user");
+    build_cat.setLinkerScriptPath(.{ .path = "user/user.ld" });
+    build_cat.addIncludeDir(".");
+    build_cat.addCSourceFile("user/cat.c", cflags);
+    build_cat.addObjectFile("user/ulib.o");
+    build_cat.addObjectFile("user/usys.o");
+    build_cat.addObjectFile("user/printf.o");
+    build_cat.addObjectFile("user/umalloc.o");
+    build_cat.setTarget(target);
+    build_cat.target_abi = .lp64d;
+    build_cat.code_model = .medium;
+    build_cat.pie = false;
+    build_cat.setBuildMode(mode);
+
+    const cat = b.step("cat", "Build xv6 cat user executable");
+    cat.dependOn(&build_cat.step);
+
     const build_mkfs = b.addExecutable("mkfs", null);
     build_mkfs.setOutputDir("mkfs");
     build_mkfs.addIncludeDir(".");
@@ -90,6 +108,7 @@ pub fn build(b: *std.build.Builder) void {
     var build_fs_img = build_mkfs.run();
     build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" } ++ UPROGS);
     build_fs_img.step.dependOn(&build_kernel.step);
+    build_fs_img.step.dependOn(&build_cat.step);
 
     const fs_img = b.step("fs.img", "Create fs.img");
     fs_img.dependOn(&build_fs_img.step);

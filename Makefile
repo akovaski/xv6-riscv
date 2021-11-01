@@ -90,7 +90,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 .PRECIOUS: %.o
 
 UPROGS=\
-	$U/_cat\
 	$U/_echo\
 	$U/_forktest\
 	$U/_grep\
