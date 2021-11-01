@@ -58,11 +58,6 @@ pub fn build(b: *std.build.Builder) void {
     kernel.dependOn(&build_kernel.step);
     b.default_step = kernel;
 
-    const build_cat = buildUserExec(b, target, mode, cflags, "cat", "cat.c");
-    const build_echo = buildUserExec(b, target, mode, cflags, "echo", "echo.c");
-    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest", "forktest.c");
-    const build_grep = buildUserExec(b, target, mode, cflags, "grep", "grep.c");
-
     const build_mkfs = b.addExecutable("mkfs", null);
     build_mkfs.setOutputDir("mkfs");
     build_mkfs.addIncludeDir(".");
@@ -74,31 +69,51 @@ pub fn build(b: *std.build.Builder) void {
     const mkfs = b.step("mkfs", "Build mkfs executable");
     mkfs.dependOn(&build_mkfs.step);
 
+    const build_cat = buildUserExec(b, target, mode, cflags, "cat", "cat.c");
+    const build_echo = buildUserExec(b, target, mode, cflags, "echo", "echo.c");
+    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest", "forktest.c");
+    const build_grep = buildUserExec(b, target, mode, cflags, "grep", "grep.c");
+    //_init
+    const build_kill = buildUserExec(b, target, mode, cflags, "kill", "kill.c");
+    const build_ln = buildUserExec(b, target, mode, cflags, "ln", "ln.c");
+    const build_ls = buildUserExec(b, target, mode, cflags, "ls", "ls.c");
+    const build_mkdir = buildUserExec(b, target, mode, cflags, "mkdir", "mkdir.c");
+    const build_rm = buildUserExec(b, target, mode, cflags, "rm", "rm.c");
+    const build_sh = buildUserExec(b, target, mode, cflags, "sh", "sh.c");
+    const build_stressfs = buildUserExec(b, target, mode, cflags, "stressfs", "stressfs.c");
+
     const UPROGS = [_][]const u8{
-        "user/_cat",
-        "user/_echo",
-        "user/_forktest",
-        "user/_grep",
+        //"user/_cat",
+        //"user/_echo",
+        //"user/_forktest",
+        //"user/_grep",
         "user/_init",
-        "user/_kill",
-        "user/_ln",
-        "user/_ls",
-        "user/_mkdir",
-        "user/_rm",
-        "user/_sh",
-        "user/_stressfs",
+        //"user/_kill",
+        //"user/_ln",
+        //"user/_ls",
+        //"user/_mkdir",
+        //"user/_rm",
+        //"user/_sh",
+        //"user/_stressfs",
         "user/_usertests",
         "user/_grind",
         "user/_wc",
         "user/_zombie",
     };
     var build_fs_img = build_mkfs.run();
-    build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" } ++ UPROGS);
-    build_fs_img.step.dependOn(&build_kernel.step);
-    build_fs_img.step.dependOn(&build_cat.step);
-    build_fs_img.step.dependOn(&build_echo.step);
-    build_fs_img.step.dependOn(&build_forktest.step);
-    build_fs_img.step.dependOn(&build_grep.step);
+    build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" });
+    build_fs_img.addFileSourceArg(build_cat.getOutputSource());
+    build_fs_img.addFileSourceArg(build_echo.getOutputSource());
+    build_fs_img.addFileSourceArg(build_forktest.getOutputSource());
+    build_fs_img.addFileSourceArg(build_grep.getOutputSource());
+    build_fs_img.addFileSourceArg(build_kill.getOutputSource());
+    build_fs_img.addFileSourceArg(build_ln.getOutputSource());
+    build_fs_img.addFileSourceArg(build_ls.getOutputSource());
+    build_fs_img.addFileSourceArg(build_mkdir.getOutputSource());
+    build_fs_img.addFileSourceArg(build_rm.getOutputSource());
+    build_fs_img.addFileSourceArg(build_sh.getOutputSource());
+    build_fs_img.addFileSourceArg(build_stressfs.getOutputSource());
+    build_fs_img.addArgs(&UPROGS);
 
     const fs_img = b.step("fs.img", "Create fs.img");
     fs_img.dependOn(&build_fs_img.step);

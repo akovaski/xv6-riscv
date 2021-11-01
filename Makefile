@@ -91,13 +91,6 @@ $U/_forktest: $U/forktest.o $(ULIB)
 
 UPROGS=\
 	$U/_init\
-	$U/_kill\
-	$U/_ln\
-	$U/_ls\
-	$U/_mkdir\
-	$U/_rm\
-	$U/_sh\
-	$U/_stressfs\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
