@@ -32,56 +32,14 @@ KERNEL_SRC = \
 
 QEMU = qemu-system-riscv64
 
-CC = clang-13 -target riscv64-unknown-elf -mno-relax -march=rv64imafdc
-AS = clang-13 -target riscv64-unknown-elf -mno-relax
-LD = ld.lld-13
-OBJCOPY = llvm-objcopy-13
-OBJDUMP = llvm-objdump-13
-
-CFLAGS = -Wall -Werror -Os -fno-omit-frame-pointer -ggdb
-CFLAGS += -MD
-CFLAGS += -mcmodel=medany
-CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
-CFLAGS += -I.
-CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
-
-# Disable PIE when possible (for Ubuntu 16.10 toolchain)
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
-CFLAGS += -fno-pie -no-pie
-endif
-ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
-CFLAGS += -fno-pie -nopie
-endif
-
 LDFLAGS = -z max-page-size=4096
 
 $K/kernel: $(KERNEL_SRC) $K/kernel.ld build.zig
 	#$(LD) $(LDFLAGS) -T $K/kernel.ld -o $K/kernel $(OBJS)
-	zig build kernel
-	$(OBJDUMP) -S $K/kernel > $K/kernel.asm
-	$(OBJDUMP) -t $K/kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $K/kernel.sym
+	zig build kernel/kernel
 
 tags: $(KERNEL_SRC)
 	etags $(KERNEL_SRC)
-
-_%: %.o
-	#$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
-	$(OBJDUMP) -S $@ > $*.asm
-	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
-
-$U/_forktest: $U/forktest.o
-	# forktest has less library code linked in - needs to be small
-	# in order to be able to max out the proc table.
-	#$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
-	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
-
-# Prevent deletion of intermediate files, e.g. cat.o, after first build, so
-# that disk image changes after first build are persistent until clean.  More
-# details:
-# http://www.gnu.org/software/make/manual/html_node/Chained-Rules.html
-.PRECIOUS: %.o
-
--include kernel/*.d user/*.d
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
@@ -90,7 +48,7 @@ clean:
 	mkfs/mkfs .gdbinit \
         $U/usys.S \
 	user/_*
-	rm -rf zig-cache zig-out
+	rm -rf zig-out
 
 # try to generate a unique GDB port
 GDBPORT = $(shell expr `id -u` % 5000 + 25000)

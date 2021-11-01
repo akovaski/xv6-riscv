@@ -54,9 +54,16 @@ pub fn build(b: *std.build.Builder) void {
     build_kernel.pie = false;
     build_kernel.setBuildMode(mode);
 
-    const kernel = b.step("kernel", "Build xv6 kernel");
+    const kernel = b.step("kernel/kernel", "Build xv6 kernel AND .asm/.sym files");
     kernel.dependOn(&build_kernel.step);
     b.default_step = kernel;
+
+    {
+        const create_syms = createSym(b, build_kernel, "kernel/kernel");
+        for (create_syms) |create_sym| {
+            kernel.dependOn(&create_sym.step);
+        }
+    }
 
     const build_mkfs = b.addExecutable("mkfs", null);
     build_mkfs.setOutputDir("mkfs");
@@ -132,7 +139,7 @@ fn buildUserLib(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.bu
     build_user_lib.code_model = .medium;
     build_user_lib.setBuildMode(mode);
 
-    const user_exec = b.step(name, "Build xv6 " ++ name ++ " user library");
+    const user_exec = b.step("user/" ++ name ++ ".o", "Build xv6 " ++ name ++ " user library");
     user_exec.dependOn(&build_user_lib.step);
 
     return build_user_lib;
@@ -143,7 +150,7 @@ fn buildUsys(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.built
     build_usys_s.addFileSourceArg(usys_pl_src);
     build_usys_s.addArg("user/usys.S");
 
-    const usys_s = b.step("usys.S", "Build usys.S file");
+    const usys_s = b.step("user/usys.S", "Build usys.S file");
     usys_s.dependOn(&build_usys_s.step);
 
     const build_usys = b.addObject("usys", null);
@@ -156,7 +163,7 @@ fn buildUsys(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.built
     build_usys.setBuildMode(mode);
     build_usys.step.dependOn(&build_usys_s.step);
 
-    const usys = b.step("usys", "Build xv6 usys user library");
+    const usys = b.step("user/usys.o", "Build xv6 usys user library");
     usys.dependOn(&build_usys.step);
 
     return build_usys;
@@ -177,8 +184,30 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     build_user_exec.pie = false;
     build_user_exec.setBuildMode(mode);
 
-    const user_exec = b.step(name, "Build xv6 " ++ name ++ " user executable");
+    const user_exec = b.step("user/_" ++ name, "Build xv6 " ++ name ++ " user executable AND .asm,.sym files");
     user_exec.dependOn(&build_user_exec.step);
 
+    const create_syms = createSym(b, build_user_exec, "user/_" ++ name);
+    for (create_syms) |create_sym| {
+        user_exec.dependOn(&create_sym.step);
+    }
+
     return build_user_exec;
+}
+
+fn createSym(b: *std.build.Builder, bin: *std.build.LibExeObjStep, comptime exec_path: []const u8) [2]*std.build.RunStep {
+    const run_create_asm = b.addSystemCommand(&[_][]const u8{
+        "sh",
+        "-c",
+        "llvm-objdump-13 -S " ++ exec_path ++ " > " ++ exec_path ++ ".asm",
+    });
+    run_create_asm.step.dependOn(&bin.step);
+    const run_create_sym = b.addSystemCommand(&[_][]const u8{
+        "sh",
+        "-c",
+        "llvm-objdump-13 -t " ++ exec_path ++ " | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > " ++ exec_path ++ ".sym",
+    });
+    run_create_sym.step.dependOn(&bin.step);
+
+    return [_]*std.build.RunStep{ run_create_asm, run_create_sym };
 }
