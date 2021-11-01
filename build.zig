@@ -64,7 +64,6 @@ pub fn build(b: *std.build.Builder) void {
     build_mkfs.addCSourceFile("mkfs/mkfs.c", cflags);
     build_mkfs.setBuildMode(.Debug);
     build_mkfs.linkLibC();
-    build_mkfs.setTarget(b.standardTargetOptions(.{}));
 
     const mkfs = b.step("mkfs", "Build mkfs executable");
     mkfs.dependOn(&build_mkfs.step);
@@ -75,47 +74,32 @@ pub fn build(b: *std.build.Builder) void {
     const build_umalloc = buildUserLib(b, target, mode, cflags, "umalloc");
     const ulib: []*std.build.LibExeObjStep = &[_]*std.build.LibExeObjStep{ build_ulib, build_usys, build_printf, build_umalloc };
 
-    var build_cat = buildUserExec(b, target, mode, cflags, "cat", ulib);
-    build_cat.step.dependOn(&build_ulib.step);
-    build_cat.step.dependOn(&build_usys.step);
-    build_cat.step.dependOn(&build_printf.step);
-    build_cat.step.dependOn(&build_umalloc.step);
-    const build_echo = buildUserExec(b, target, mode, cflags, "echo", ulib);
-    const build_forktest = buildUserExec(b, target, mode, cflags, "forktest", &[2]*std.build.LibExeObjStep{ build_ulib, build_usys });
-    const build_grep = buildUserExec(b, target, mode, cflags, "grep", ulib);
-    const build_init = buildUserExec(b, target, mode, cflags, "init", ulib);
-    const build_kill = buildUserExec(b, target, mode, cflags, "kill", ulib);
-    const build_ln = buildUserExec(b, target, mode, cflags, "ln", ulib);
-    const build_ls = buildUserExec(b, target, mode, cflags, "ls", ulib);
-    const build_mkdir = buildUserExec(b, target, mode, cflags, "mkdir", ulib);
-    const build_rm = buildUserExec(b, target, mode, cflags, "rm", ulib);
-    const build_sh = buildUserExec(b, target, mode, cflags, "sh", ulib);
-    const build_stressfs = buildUserExec(b, target, mode, cflags, "stressfs", ulib);
-    const build_usertests = buildUserExec(b, target, mode, cflags, "usertests", ulib);
-    const build_grind = buildUserExec(b, target, mode, cflags, "grind", ulib);
-    const build_wc = buildUserExec(b, target, mode, cflags, "wc", ulib);
-    const build_zombie = buildUserExec(b, target, mode, cflags, "zombie", ulib);
+    var user_programs = [_]*std.build.LibExeObjStep{
+        buildUserExec(b, target, mode, cflags, "cat", ulib),
+        buildUserExec(b, target, mode, cflags, "echo", ulib),
+        buildUserExec(b, target, mode, cflags, "forktest", &[2]*std.build.LibExeObjStep{ build_ulib, build_usys }),
+        buildUserExec(b, target, mode, cflags, "grep", ulib),
+        buildUserExec(b, target, mode, cflags, "init", ulib),
+        buildUserExec(b, target, mode, cflags, "kill", ulib),
+        buildUserExec(b, target, mode, cflags, "ln", ulib),
+        buildUserExec(b, target, mode, cflags, "ls", ulib),
+        buildUserExec(b, target, mode, cflags, "mkdir", ulib),
+        buildUserExec(b, target, mode, cflags, "rm", ulib),
+        buildUserExec(b, target, mode, cflags, "sh", ulib),
+        buildUserExec(b, target, mode, cflags, "stressfs", ulib),
+        buildUserExec(b, target, mode, cflags, "usertests", ulib),
+        buildUserExec(b, target, mode, cflags, "grind", ulib),
+        buildUserExec(b, target, mode, cflags, "wc", ulib),
+        buildUserExec(b, target, mode, cflags, "zombie", ulib),
+    };
 
     var build_fs_img = build_mkfs.run();
     build_fs_img.addArgs(&[_][]const u8{ "fs.img", "README" });
     const readme_src = std.build.FileSource{ .path = "README" };
     readme_src.addStepDependencies(&build_fs_img.step);
-    build_fs_img.addFileSourceArg(build_cat.getOutputSource());
-    build_fs_img.addFileSourceArg(build_echo.getOutputSource());
-    build_fs_img.addFileSourceArg(build_forktest.getOutputSource());
-    build_fs_img.addFileSourceArg(build_grep.getOutputSource());
-    build_fs_img.addFileSourceArg(build_init.getOutputSource());
-    build_fs_img.addFileSourceArg(build_kill.getOutputSource());
-    build_fs_img.addFileSourceArg(build_ln.getOutputSource());
-    build_fs_img.addFileSourceArg(build_ls.getOutputSource());
-    build_fs_img.addFileSourceArg(build_mkdir.getOutputSource());
-    build_fs_img.addFileSourceArg(build_rm.getOutputSource());
-    build_fs_img.addFileSourceArg(build_sh.getOutputSource());
-    build_fs_img.addFileSourceArg(build_stressfs.getOutputSource());
-    build_fs_img.addFileSourceArg(build_usertests.getOutputSource());
-    build_fs_img.addFileSourceArg(build_grind.getOutputSource());
-    build_fs_img.addFileSourceArg(build_wc.getOutputSource());
-    build_fs_img.addFileSourceArg(build_zombie.getOutputSource());
+    for (user_programs) |program| {
+        build_fs_img.addFileSourceArg(program.getOutputSource());
+    }
 
     const fs_img = b.step("fs.img", "Create fs.img");
     fs_img.dependOn(&build_fs_img.step);
