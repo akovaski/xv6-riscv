@@ -8,6 +8,7 @@ const std = @import("std");
 
 // I would like to have this type be !noreturn,
 // but the zig compiler runs away if I do that
+// https://github.com/ziglang/zig/issues/3461
 fn my_fork() !void {
     c.printf("Starting my_fork\n");
     const pid = c.fork();

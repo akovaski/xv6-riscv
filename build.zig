@@ -99,6 +99,7 @@ pub fn build(b: *std.build.Builder) void {
         buildUserCExec(b, target, mode, cflags, "wc", ulib),
         buildUserCExec(b, target, mode, cflags, "zombie", ulib),
         buildUserZigExec(b, target, mode, "my_fork", ulib),
+        buildUserZigExec(b, target, mode, "my_call_echo", ulib),
     };
 
     var build_fs_img = build_mkfs.run();
