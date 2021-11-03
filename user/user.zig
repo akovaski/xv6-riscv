@@ -10,6 +10,7 @@ pub const exit = c.exit;
 pub const read = c.read;
 pub const write = c.write;
 pub const wait = c.wait;
+pub const getpid = c.getpid;
 
 // parent process: return child's PID
 // child process: return null
