@@ -94,7 +94,7 @@ pub fn build(b: *std.build.Builder) void {
         buildUserCExec(b, target, mode, cflags, "rm", ulib),
         buildUserCExec(b, target, mode, cflags, "sh", ulib),
         buildUserCExec(b, target, mode, cflags, "stressfs", ulib),
-        buildUserCExec(b, target, mode, cflags, "usertests", ulib),
+        //buildUserCExec(b, target, mode, cflags, "usertests", ulib),
         buildUserCExec(b, target, mode, cflags, "grind", ulib),
         buildUserCExec(b, target, mode, cflags, "wc", ulib),
         buildUserCExec(b, target, mode, cflags, "zombie", ulib),
