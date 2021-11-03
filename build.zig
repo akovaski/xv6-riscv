@@ -100,6 +100,8 @@ pub fn build(b: *std.build.Builder) void {
         buildUserCExec(b, target, mode, cflags, "zombie", ulib),
         buildUserZigExec(b, target, mode, "my_fork", ulib),
         buildUserZigExec(b, target, mode, "my_call_echo", ulib),
+        buildUserZigExec(b, target, mode, "my_cat", ulib),
+        buildUserZigExec(b, target, mode, "sleep", ulib),
     };
 
     var build_fs_img = build_mkfs.run();
@@ -215,7 +217,7 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     build_user_exec.pie = false;
     build_user_exec.setBuildMode(mode);
 
-    const user_exec = b.step("user/_" ++ source.name(), "Build xv6 " ++ source.name() ++ " user executable AND .asm,.sym files");
+    const user_exec = b.step("user/" ++ source.name(), "Build xv6 " ++ source.name() ++ " user executable AND .asm,.sym files");
     user_exec.dependOn(&build_user_exec.step);
 
     const create_syms = createSym(b, build_user_exec, "user/_" ++ source.name());
