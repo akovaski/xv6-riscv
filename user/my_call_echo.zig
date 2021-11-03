@@ -1,10 +1,5 @@
-const c = @cImport({
-    @cInclude("kernel/types.h");
-    @cInclude("kernel/stat.h");
-    @cInclude("user/user.h");
-});
-
 const std = @import("std");
+const os = @import("user.zig");
 
 extern fn exec([*:0]const u8, [*:null]const ?[*:0]const u8) i32;
 export fn main() i32 {
@@ -15,6 +10,6 @@ export fn main() i32 {
     };
     const command = "echo";
     const ret: i32 = exec(command, &argv);
-    c.fprintf(2, "my_call_echo failed: %d\n", ret);
-    c.exit(1);
+    os.fprintf(2, "my_call_echo failed: %d\n", ret);
+    os.exit(1);
 }
