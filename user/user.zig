@@ -9,6 +9,7 @@ pub const fprintf = c.fprintf;
 pub const exit = c.exit;
 pub const read = c.read;
 pub const write = c.write;
+pub const close = c.close;
 pub const wait = c.wait;
 pub const getpid = c.getpid;
 

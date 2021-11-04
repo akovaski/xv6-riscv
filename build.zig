@@ -103,6 +103,7 @@ pub fn build(b: *std.build.Builder) void {
         buildUserZigExec(b, target, mode, "my_cat", ulib),
         buildUserZigExec(b, target, mode, "sleep", ulib),
         buildUserZigExec(b, target, mode, "pingpong", ulib),
+        buildUserZigExec(b, target, mode, "primes", ulib),
     };
 
     var build_fs_img = build_mkfs.run();
