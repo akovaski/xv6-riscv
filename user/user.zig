@@ -15,6 +15,9 @@ pub const close = c.close;
 pub const wait = c.wait;
 pub const getpid = c.getpid;
 pub const MAXPATH = c.MAXPATH;
+pub const MAXARG = c.MAXARG;
+
+pub extern fn exec([*:0]const u8, [*:null]const ?[*:0]const u8) i32;
 
 pub fn open(path: [*:0]const u8, flags: i32) !i32 {
     const fd = c.open(path, flags);
