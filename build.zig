@@ -98,13 +98,14 @@ pub fn build(b: *std.build.Builder) void {
         buildUserCExec(b, target, mode, cflags, "grind", ulib),
         buildUserCExec(b, target, mode, cflags, "wc", ulib),
         buildUserCExec(b, target, mode, cflags, "zombie", ulib),
-        buildUserZigExec(b, target, mode, "my_fork", ulib),
-        buildUserZigExec(b, target, mode, "my_call_echo", ulib),
-        buildUserZigExec(b, target, mode, "my_cat", ulib),
+        //buildUserZigExec(b, target, mode, "my_fork", ulib),
+        //buildUserZigExec(b, target, mode, "my_call_echo", ulib),
+        //buildUserZigExec(b, target, mode, "my_cat", ulib),
         buildUserZigExec(b, target, mode, "sleep", ulib),
-        buildUserZigExec(b, target, mode, "pingpong", ulib),
+        //buildUserZigExec(b, target, mode, "pingpong", ulib),
         //buildUserZigExec(b, target, mode, "primes", ulib),
         buildUserZigExec(b, target, mode, "find", ulib),
+        //buildUserZigExec(b, target, mode, "xargs", ulib),
     };
 
     var build_fs_img = build_mkfs.run();

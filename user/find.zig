@@ -9,13 +9,12 @@ export fn main(argc: i32, argv: [*][*:0]const u8) i32 {
     const path = std.mem.spanZ(argv[1]);
     const match = std.mem.spanZ(argv[2]);
 
-    // hope for paths shorter than 512 characters
-    var prefix: [511:0]u8 = undefined;
+    var prefix: [os.MAXPATH:0]u8 = undefined;
 
     find(&prefix, 0, path, match);
     os.exit(0);
 }
-fn find(prefix: *[511:0]u8, prefix_len: usize, path: [:0]const u8, match: [:0]const u8) void {
+fn find(prefix: *[os.MAXPATH:0]u8, prefix_len: usize, path: [:0]const u8, match: [:0]const u8) void {
     const new_prefix_len = appendPath(prefix, prefix_len, path);
     if (std.cstr.cmp(path, match) == 0) {
         os.printf("%s\n", prefix);
@@ -50,7 +49,7 @@ fn find(prefix: *[511:0]u8, prefix_len: usize, path: [:0]const u8, match: [:0]co
 }
 
 // appends /path to prefix and returns the new prefix_len
-fn appendPath(prefix: *[511:0]u8, prefix_len: usize, path: [:0]const u8) usize {
+fn appendPath(prefix: *[os.MAXPATH:0]u8, prefix_len: usize, path: [:0]const u8) usize {
     var new_prefix_len = prefix_len;
     if (prefix_len != 0) {
         prefix[prefix_len] = '/';

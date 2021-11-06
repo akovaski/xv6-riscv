@@ -1,8 +1,9 @@
 const c = @cImport({
     @cInclude("kernel/types.h");
     @cInclude("kernel/stat.h");
-    @cInclude("user/user.h");
     @cInclude("kernel/fs.h");
+    @cInclude("kernel/param.h");
+    @cInclude("user/user.h");
 });
 
 pub const printf = c.printf;
@@ -13,6 +14,7 @@ pub const write = c.write;
 pub const close = c.close;
 pub const wait = c.wait;
 pub const getpid = c.getpid;
+pub const MAXPATH = c.MAXPATH;
 
 pub fn open(path: [*:0]const u8, flags: i32) !i32 {
     const fd = c.open(path, flags);
