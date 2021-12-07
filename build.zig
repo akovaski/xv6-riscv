@@ -49,7 +49,6 @@ pub fn build(b: *std.build.Builder) void {
     build_kernel.addCSourceFile("kernel/plic.c", cflags);
     build_kernel.addCSourceFile("kernel/virtio_disk.c", cflags);
     build_kernel.setTarget(target);
-    build_kernel.target_abi = .lp64d;
     build_kernel.code_model = .medium;
     build_kernel.pie = false;
     build_kernel.setBuildMode(mode);
@@ -135,7 +134,6 @@ fn buildUserLib(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.bu
     build_user_lib.addIncludeDir(".");
     build_user_lib.addCSourceFile("user/" ++ name ++ ".c", cflags);
     build_user_lib.setTarget(target);
-    build_user_lib.target_abi = .lp64d;
     build_user_lib.code_model = .medium;
     build_user_lib.setBuildMode(mode);
 
@@ -158,7 +156,6 @@ fn buildUsys(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.built
     build_usys.addIncludeDir(".");
     build_usys.addAssemblyFile("user/usys.S");
     build_usys.setTarget(target);
-    build_usys.target_abi = .lp64d;
     build_usys.code_model = .medium;
     build_usys.setBuildMode(mode);
     build_usys.step.dependOn(&build_usys_s.step);
@@ -179,7 +176,6 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
         build_user_exec.addObject(lib);
     }
     build_user_exec.setTarget(target);
-    build_user_exec.target_abi = .lp64d;
     build_user_exec.code_model = .medium;
     build_user_exec.pie = false;
     build_user_exec.setBuildMode(mode);
