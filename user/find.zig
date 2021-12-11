@@ -6,8 +6,8 @@ export fn main(argc: i32, argv: [*][*:0]const u8) i32 {
         os.fprintf(2, "error: requires exactly two arguments\n");
         os.exit(1);
     }
-    const path = std.mem.spanZ(argv[1]);
-    const match = std.mem.spanZ(argv[2]);
+    const path = std.mem.span(argv[1]);
+    const match = std.mem.span(argv[2]);
 
     var prefix: [os.MAXPATH:0]u8 = undefined;
 
@@ -41,7 +41,7 @@ fn find(prefix: *[os.MAXPATH:0]u8, prefix_len: usize, path: [:0]const u8, match:
                 if (std.cstr.cmp(&p, ".") == 0 or std.cstr.cmp(&p, "..") == 0) {
                     continue;
                 }
-                find(prefix, new_prefix_len, std.mem.spanZ(&p), match);
+                find(prefix, new_prefix_len, std.mem.span(&p), match);
             }
         },
         else => {},
