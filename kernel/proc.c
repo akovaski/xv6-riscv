@@ -315,6 +315,8 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  np->trace_mask = p->trace_mask;
+
   return pid;
 }
 
@@ -653,4 +655,11 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int trace(int mask)
+{
+  struct proc *p = myproc();
+  p->trace_mask = mask;
+  return 0;
 }

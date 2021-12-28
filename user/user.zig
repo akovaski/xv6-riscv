@@ -17,6 +17,12 @@ pub const getpid = c.getpid;
 pub const MAXPATH = c.MAXPATH;
 pub const MAXARG = c.MAXARG;
 
+pub fn trace(mask: i32) !void {
+    const ret = c.trace(mask);
+    if (ret < 0) {
+        return error.TraceError;
+    }
+}
 pub extern fn exec([*:0]const u8, [*:null]const ?[*:0]const u8) i32;
 
 pub fn open(path: [*:0]const u8, flags: i32) !i32 {
