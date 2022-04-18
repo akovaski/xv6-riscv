@@ -195,13 +195,13 @@ fn createSym(b: *std.build.Builder, bin: *std.build.LibExeObjStep, comptime exec
     const run_create_asm = b.addSystemCommand(&[_][]const u8{
         "sh",
         "-c",
-        "llvm-objdump-13 -S " ++ exec_path ++ " > " ++ exec_path ++ ".asm",
+        "llvm-objdump -S " ++ exec_path ++ " > " ++ exec_path ++ ".asm",
     });
     run_create_asm.step.dependOn(&bin.step);
     const run_create_sym = b.addSystemCommand(&[_][]const u8{
         "sh",
         "-c",
-        "llvm-objdump-13 -t " ++ exec_path ++ " | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > " ++ exec_path ++ ".sym",
+        "llvm-objdump -t " ++ exec_path ++ " | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > " ++ exec_path ++ ".sym",
     });
     run_create_sym.step.dependOn(&bin.step);
 
