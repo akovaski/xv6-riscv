@@ -2,6 +2,7 @@ const c = @cImport({
     @cInclude("kernel/types.h");
     @cInclude("kernel/stat.h");
     @cInclude("kernel/fs.h");
+    @cInclude("kernel/sysinfo.h");
     @cInclude("kernel/param.h");
     @cInclude("user/user.h");
 });
@@ -16,6 +17,21 @@ pub const wait = c.wait;
 pub const getpid = c.getpid;
 pub const MAXPATH = c.MAXPATH;
 pub const MAXARG = c.MAXARG;
+
+pub const SysInfo = struct {
+    freemem: i64,
+    nproc: i32,
+};
+pub fn sysinfo() !SysInfo {
+    var info: c.struct_sysinfo = undefined;
+    if (c.sysinfo(&info) < 0) {
+        return error.SysInfoError;
+    }
+    return SysInfo {
+        .freemem = info.freemem,
+        .nproc = info.nproc,
+    };
+}
 
 pub fn trace(mask: i32) !void {
     const ret = c.trace(mask);

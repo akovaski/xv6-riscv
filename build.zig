@@ -48,6 +48,7 @@ pub fn build(b: *std.build.Builder) void {
     build_kernel.addAssemblyFile("kernel/kernelvec.S");
     build_kernel.addCSourceFile("kernel/plic.c", cflags);
     build_kernel.addCSourceFile("kernel/virtio_disk.c", cflags);
+    build_kernel.addCSourceFile("kernel/sysinfo.c", cflags);
     build_kernel.setTarget(target);
     build_kernel.code_model = .medium;
     build_kernel.pie = false;
@@ -106,6 +107,7 @@ pub fn build(b: *std.build.Builder) void {
         buildUserZigExec(b, target, mode, "find", ulib),
         buildUserZigExec(b, target, mode, "xargs", ulib),
         buildUserZigExec(b, target, mode, "trace", ulib),
+        buildUserZigExec(b, target, mode, "sysinfo", ulib),
     };
 
     var build_fs_img = build_mkfs.run();

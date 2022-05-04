@@ -106,3 +106,15 @@ sys_trace(void)
     return -1;
   return trace(mask);
 }
+
+// return information about the running system:
+// - freemem: number of bytes of free memory
+// - nproc: number of processes
+uint64
+sys_sysinfo(void)
+{
+  uint64 info; // user pointer to struct sysinfo
+  if(argaddr(0, &info) < 0)
+    return -1;
+  return systeminfo(info);
+}
