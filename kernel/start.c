@@ -10,6 +10,9 @@ void timerinit();
 // entry.S needs one stack per CPU.
 __attribute__ ((aligned (16))) char stack0[4096 * NCPU];
 
+// _dtb stores the address of the device tree
+struct fdt_header *_dtb = 0;
+
 // a scratch area per CPU for machine-mode timer interrupts.
 uint64 timer_scratch[NCPU][5];
 

@@ -1,4 +1,3 @@
-*~
 _*
 *.o
 *.d
@@ -17,3 +16,7 @@ user/usys.S
 .gdbinit
 zig-cache
 zig-out
+
+#editor files
+*~
+.vscode/
