@@ -1,0 +1,1 @@
+void walk_device_tree();

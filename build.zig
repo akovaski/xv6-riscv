@@ -15,7 +15,7 @@ pub fn build(b: *std.build.Builder) void {
         .abi = .none,
     };
 
-    const build_kernel = b.addExecutable("kernel", null);
+    const build_kernel = b.addExecutable("kernel", "kernel/kernel.zig");
     build_kernel.setOutputDir("kernel");
 
     build_kernel.setLinkerScriptPath(.{ .path = "kernel/kernel.ld" });
