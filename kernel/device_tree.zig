@@ -59,7 +59,7 @@ export fn walk_device_tree() void {
         printf("Found\n");
         var props = node.properties;
         while (props.next()) |prop| {
-            print_property(prop.name, prop.value);
+            print_property(prop);
         }
     } else {
         printf("Not found\n");
@@ -69,21 +69,139 @@ fn walk_device_tree_iter(level: u32, iter_arg: DtNodeIter) void {
     var iter = iter_arg;
     while (iter.next()) |node| {
         print_level_indent(level);
-        printf("Node Name: %s\n", node.name.ptr);
+        printf("Node: %s\n", node.name.ptr);
         var props = node.properties;
         while (props.next()) |prop| {
             print_level_indent(level + 1);
-            print_property(prop.name, prop.value);
+            print_property(prop);
         }
         walk_device_tree_iter(level + 1, node.children);
     }
 }
-fn print_property(name: []u8, value: []u8) void {
-    printf("Property (%s) =", name.ptr);
-    for (value) |val| {
-        printf(" %x", @intCast(u32, val));
+fn print_property(prop: DtProp) void {
+    printf(".%s: ", prop.name.ptr);
+    const PropertyType = enum {
+        unknown,
+        // standard types:
+        empty,
+        u32,
+        u64,
+        string,
+        phandle,
+        stringlist,
+        // prop-encoded-arrays:
+        reg,
+    };
+    const property_type_map = [_]struct { n: []const u8, t: PropertyType }{
+        .{ .n = "#address-cells", .t = .u32 },
+        .{ .n = "#interrupt-cells", .t = .u32 },
+        .{ .n = "#size-cells", .t = .u32 },
+        // bank-width = ?
+        .{ .n = "bootargs", .t = .string },
+        // bus-range = ?
+        // clock-frequency = or
+        .{ .n = "compatible", .t = .stringlist },
+        .{ .n = "cpu", .t = .phandle },
+        .{ .n = "device_type", .t = .string },
+        // dma-coherent = ?
+        .{ .n = "interrupt-controller", .t = .empty },
+        // interrupt-map = []
+        // 1 interrupt-map-mask = []
+        .{ .n = "interrupt-parent", .t = .phandle },
+        // 10 interrupts = []
+        // 2 interrupts-extended = []
+        // 1 linux,pci-domain = u32?
+        .{ .n = "mmu-type", .t = .string },
+        .{ .n = "model", .t = .string },
+        // offset = u32?
+        .{ .n = "phandle", .t = .phandle },
+        // ranges = []
+        .{ .n = "reg", .t = .reg },
+        // 2 regmap = u32?
+        .{ .n = "riscv,isa", .t = .string },
+        // 1 riscv,ndev = u32?
+        .{ .n = "status", .t = .string },
+        .{ .n = "stdin-path", .t = .string },
+        .{ .n = "stdout-path", .t = .string },
+        // 1 timebase-frequency = or
+        // 2 value = u32?
+    };
+    var property_type: PropertyType = .unknown;
+    for (property_type_map) |nt| {
+        if (std.mem.eql(u8, nt.n, prop.name)) {
+            property_type = nt.t;
+            break;
+        }
+    }
+
+    switch (property_type) {
+        .u32 => printf("(u32) %d", be_int(u32, prop.value)),
+        .u64 => printf("(u64) %d", be_int(u64, prop.value)),
+        .reg => {
+            printf("(reg %d,%d) ", prop.address_cells, prop.size_cells);
+            printf("< ");
+
+            const address_size = prop.address_cells * 4;
+            const size_size = prop.size_cells * 4;
+            const pair_size = address_size + size_size;
+
+            var pair_n: usize = 0;
+            while (pair_n < prop.value.len / pair_size) : (pair_n += 1) {
+                const pair = prop.value[pair_size * pair_n .. pair_size * (pair_n + 1)];
+
+                const RegBlock = struct {
+                    offset: u64,
+                    size: u64,
+                };
+                var block: RegBlock = .{ .offset = 0, .size = 0 };
+                for (pair[0..address_size]) |v| {
+                    block.offset = (block.offset << 8) | v;
+                }
+                for (pair[address_size..]) |v| {
+                    block.size = (block.size << 8) | v;
+                }
+                printf("%p ", block.offset);
+                if (prop.size_cells != 0) {
+                    printf("%x ", block.size);
+                } else {
+                    printf("- ");
+                }
+            }
+            printf(">");
+        },
+        .string => {
+            printf("(string) \"%s\"", prop.value.ptr);
+        },
+        .stringlist => {
+            printf("(stringlist) ");
+            var iter = std.mem.split(u8, prop.value, "\x00");
+            var first = true;
+            while (iter.next()) |str| {
+                if (first) {
+                    first = false;
+                } else {
+                    printf(", ");
+                }
+                printf("\"%s\"", str.ptr);
+            }
+        },
+        .empty => printf("(empty)"),
+        .phandle => printf("(handle) %d", be_int(u32, prop.value)),
+        .unknown => {
+            printf("(unknown) ");
+            for (prop.value) |val| {
+                printf(" %x", @intCast(u32, val));
+            }
+        },
     }
     printf("\n");
+}
+fn be_int(comptime T: type, value: []const u8) T {
+    var scratch: T = 0;
+    for (value) |v| {
+        scratch = (scratch << 8) | v;
+    }
+    return scratch;
 }
 
 const FDT = struct {
@@ -105,8 +223,10 @@ const DtNode = struct {
 };
 const DtNodeIter = struct {
     dt_offset: usize,
+    address_cells: u32,
+    size_cells: u32,
     fn root() DtNodeIter {
-        return DtNodeIter{ .dt_offset = 0 };
+        return DtNodeIter{ .dt_offset = 0, .address_cells = 2, .size_cells = 1 };
     }
     fn next(self: *DtNodeIter) ?DtNode {
         var node: DtNode = undefined;
@@ -118,19 +238,21 @@ const DtNodeIter = struct {
         self.dt_offset += node.name.len + 1; // name
         self.dt_offset = roundup(self.dt_offset);
 
-        node.properties = DtPropIter{ .dt_offset = self.dt_offset };
+        node.properties = DtPropIter{ .dt_offset = self.dt_offset, .address_cells = self.address_cells, .size_cells = self.size_cells };
 
-        // parse properties
-        while (FdtHeader.dt_struct(self.dt_offset) == FDT.PROP) {
-            self.dt_offset += 4; // FDT_PROP
-            const len = FdtHeader.dt_struct(self.dt_offset);
-            self.dt_offset += 4; // length
-            //ignore name_offset
-            self.dt_offset += 4; // name_offset
-            self.dt_offset += len; // value
-            self.dt_offset = roundup(self.dt_offset);
+        var address_cells: u32 = 2;
+        var size_cells: u32 = 1;
+        var props = node.properties;
+        while (props.next()) |prop| {
+            if (std.mem.eql(u8, "#address-cells", prop.name)) {
+                address_cells = be_int(u32, prop.value);
+            } else if (std.mem.eql(u8, "#size-cells", prop.name)) {
+                size_cells = be_int(u32, prop.value);
+            }
         }
-        node.children = DtNodeIter{ .dt_offset = self.dt_offset };
+        self.dt_offset = props.dt_offset;
+
+        node.children = DtNodeIter{ .dt_offset = self.dt_offset, .address_cells = address_cells, .size_cells = size_cells };
         var children = node.children;
         while (children.next() != null) {}
         self.dt_offset = children.dt_offset; // children
@@ -158,9 +280,13 @@ const DtNodeIter = struct {
 const DtProp = struct {
     name: [:0]u8,
     value: []u8,
+    address_cells: u32,
+    size_cells: u32,
 };
 const DtPropIter = struct {
     dt_offset: usize,
+    address_cells: u32,
+    size_cells: u32,
     fn next(self: *DtPropIter) ?DtProp {
         if (FdtHeader.dt_struct(self.dt_offset) != FDT.PROP) {
             return null;
@@ -176,6 +302,8 @@ const DtPropIter = struct {
         return DtProp{
             .name = std.mem.span(dtb_name(name_offset)),
             .value = value_raw[0..len],
+            .address_cells = self.address_cells,
+            .size_cells = self.size_cells,
         };
     }
 };
