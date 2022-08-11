@@ -52,7 +52,18 @@ export fn walk_device_tree() void {
     printf("_dtb: %p\n", _dtb);
     printf("magic: %p\n", dtb_uint(_dtb.magic));
     printf("struct: %p\n", dtb_uint(_dtb.off_dt_struct));
-    walk_device_tree_iter(0, DtNodeIter{ .dt_offset = 0 });
+    walk_device_tree_iter(0, DtNodeIter.root());
+
+    printf("memory:\n");
+    if (DtNodeIter.root().find("/memory@80000000")) |node| {
+        printf("Found\n");
+        var props = node.properties;
+        while (props.next()) |prop| {
+            print_property(prop.name, prop.value);
+        }
+    } else {
+        printf("Not found\n");
+    }
 }
 fn walk_device_tree_iter(level: u32, iter_arg: DtNodeIter) void {
     var iter = iter_arg;
@@ -94,6 +105,9 @@ const DtNode = struct {
 };
 const DtNodeIter = struct {
     dt_offset: usize,
+    fn root() DtNodeIter {
+        return DtNodeIter{ .dt_offset = 0 };
+    }
     fn next(self: *DtNodeIter) ?DtNode {
         var node: DtNode = undefined;
         if (FdtHeader.dt_struct(self.dt_offset) != FDT.BEGIN_NODE) {
@@ -122,6 +136,22 @@ const DtNodeIter = struct {
         self.dt_offset = children.dt_offset; // children
         self.dt_offset += 4; // FDT_END_NODE
         return node;
+    }
+    fn find(self: DtNodeIter, filter: []const u8) ?DtNode {
+        var iter = self;
+        var split = std.mem.split(u8, filter, "/");
+        const name = split.first();
+        const search_end_node = filter.len == name.len;
+        while (iter.next()) |node| {
+            if (!std.mem.eql(u8, name, node.name)) {
+                continue;
+            } else if (search_end_node) {
+                return node;
+            } else {
+                return find(node.children, split.rest());
+            }
+        }
+        return null;
     }
 };
 
