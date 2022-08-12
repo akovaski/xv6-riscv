@@ -8,11 +8,13 @@
 #include "spinlock.h"
 #include "riscv.h"
 #include "defs.h"
+#include "device_tree.h"
 
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
                    // defined by kernel.ld.
+uint64 phystop = 0;
 
 struct run {
   struct run *next;
@@ -29,7 +31,12 @@ kinit()
 {
   initlock(&kmem.lock, "kmem");
   kmem.numfreepage = 0;
-  freerange(end, (void*)PHYSTOP);
+
+  uint64 mem_size = main_memory_size();
+  printf("main memory size: %d bytes\n", mem_size);
+  phystop = KERNBASE + mem_size;
+
+  freerange(end, (void*)phystop);
 }
 
 void
@@ -50,7 +57,7 @@ kfree(void *pa)
 {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= phystop)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.

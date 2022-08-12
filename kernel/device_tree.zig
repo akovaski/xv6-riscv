@@ -122,6 +122,18 @@ fn print_property(prop: DtProp) void {
     }
     printf("\n");
 }
+export fn main_memory_size() u64 {
+    var mem_node = DtNodeIter.root().find("/memory@80000000").?;
+    while (mem_node.properties.next()) |prop| {
+        if (std.mem.eql(u8, "reg", prop.name)) {
+            var reg = prop.value.reg;
+            const block = reg.next().?;
+            return block.size.?;
+        }
+    }
+    unreachable;
+}
+
 fn be_int(comptime T: type, value: []const u8) T {
     var scratch: T = 0;
     for (value) |v| {
