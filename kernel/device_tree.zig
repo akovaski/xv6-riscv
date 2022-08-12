@@ -21,11 +21,10 @@ const FdtHeader = struct {
         const ptr = dt_raw_ptr() + dtb_uint(_dtb.*.off_dt_struct) + dt_offset;
         return dtb_uint(@ptrCast(*u32, @alignCast(4, ptr)).*);
     }
-    fn dt_string() [*]u8 {
-        return dt_raw_ptr() + dtb_uint(_dtb.*.off_dt_strings);
+    fn get_string(dt_string_offset: u32) [*:0]const u8 {
+        return @ptrCast([*:0]const u8, dt_raw_ptr() + dtb_uint(_dtb.*.off_dt_strings) + dt_string_offset);
     }
 };
-
 fn dtb_uint(x: u32) u32 {
     return (((x) & 0xff000000) >> 24) |
         (((x) & 0x00ff0000) >> 8) |
@@ -33,14 +32,6 @@ fn dtb_uint(x: u32) u32 {
         (((x) & 0x000000ff) << 24);
 }
 
-fn roundup(x: usize) usize {
-    var rem: usize = x % 4;
-    return if (rem == 0) x else x - rem + 4;
-}
-fn dtb_name(arg_name_offset: u32) [*c]u8 {
-    var name_offset = arg_name_offset;
-    return FdtHeader.dt_string() + name_offset;
-}
 fn print_level_indent(level: u32) void {
     var i: u32 = 0;
     while (i < level) : (i += 1) {
@@ -141,6 +132,10 @@ fn be_int(comptime T: type, value: []const u8) T {
     }
     return scratch;
 }
+fn roundup(x: usize) usize {
+    var rem: usize = x % 4;
+    return if (rem == 0) x else x - rem + 4;
+}
 
 const FDT = struct {
     const BEGIN_NODE = 0x1;
@@ -216,9 +211,9 @@ const DtNodeIter = struct {
 };
 
 const DtProp = struct {
-    name: [:0]u8,
+    name: [:0]const u8,
     value: Value,
-    raw_value: []u8,
+    raw_value: []const u8,
     address_cells: u32,
     size_cells: u32,
     const ValueType = enum {
@@ -298,7 +293,7 @@ const DtPropIter = struct {
         self.dt_offset += len; // value
         self.dt_offset = roundup(self.dt_offset);
 
-        const prop_name = std.mem.span(dtb_name(name_offset));
+        const prop_name = std.mem.span(FdtHeader.get_string(name_offset));
         return DtProp{
             .name = prop_name,
             .value = parseValue(prop_name, raw_value[0..len], self.address_cells, self.size_cells),
