@@ -80,101 +80,27 @@ fn walk_device_tree_iter(level: u32, iter_arg: DtNodeIter) void {
 }
 fn print_property(prop: DtProp) void {
     printf(".%s: ", prop.name.ptr);
-    const PropertyType = enum {
-        unknown,
-        // standard types:
-        empty,
-        u32,
-        u64,
-        string,
-        phandle,
-        stringlist,
-        // prop-encoded-arrays:
-        reg,
-    };
-    const property_type_map = [_]struct { n: []const u8, t: PropertyType }{
-        .{ .n = "#address-cells", .t = .u32 },
-        .{ .n = "#interrupt-cells", .t = .u32 },
-        .{ .n = "#size-cells", .t = .u32 },
-        // bank-width = ?
-        .{ .n = "bootargs", .t = .string },
-        // bus-range = ?
-        // clock-frequency = or
-        .{ .n = "compatible", .t = .stringlist },
-        .{ .n = "cpu", .t = .phandle },
-        .{ .n = "device_type", .t = .string },
-        // dma-coherent = ?
-        .{ .n = "interrupt-controller", .t = .empty },
-        // interrupt-map = []
-        // 1 interrupt-map-mask = []
-        .{ .n = "interrupt-parent", .t = .phandle },
-        // 10 interrupts = []
-        // 2 interrupts-extended = []
-        // 1 linux,pci-domain = u32?
-        .{ .n = "mmu-type", .t = .string },
-        .{ .n = "model", .t = .string },
-        // offset = u32?
-        .{ .n = "phandle", .t = .phandle },
-        // ranges = []
-        .{ .n = "reg", .t = .reg },
-        // 2 regmap = u32?
-        .{ .n = "riscv,isa", .t = .string },
-        // 1 riscv,ndev = u32?
-        .{ .n = "status", .t = .string },
-        .{ .n = "stdin-path", .t = .string },
-        .{ .n = "stdout-path", .t = .string },
-        // 1 timebase-frequency = or
-        // 2 value = u32?
-    };
-    var property_type: PropertyType = .unknown;
-    for (property_type_map) |nt| {
-        if (std.mem.eql(u8, nt.n, prop.name)) {
-            property_type = nt.t;
-            break;
-        }
-    }
-
-    switch (property_type) {
-        .u32 => printf("(u32) %d", be_int(u32, prop.value)),
-        .u64 => printf("(u64) %d", be_int(u64, prop.value)),
-        .reg => {
-            printf("(reg %d,%d) ", prop.address_cells, prop.size_cells);
+    switch (prop.value) {
+        .u32 => |val| printf("(u32) %d", val),
+        .u64 => |val| printf("(u64) %d", val),
+        .reg => |val| {
+            printf("(reg %d,%d) ", val.address_cells, val.size_cells);
             printf("< ");
-
-            const address_size = prop.address_cells * 4;
-            const size_size = prop.size_cells * 4;
-            const pair_size = address_size + size_size;
-
-            var pair_n: usize = 0;
-            while (pair_n < prop.value.len / pair_size) : (pair_n += 1) {
-                const pair = prop.value[pair_size * pair_n .. pair_size * (pair_n + 1)];
-
-                const RegBlock = struct {
-                    offset: u64,
-                    size: u64,
-                };
-                var block: RegBlock = .{ .offset = 0, .size = 0 };
-                for (pair[0..address_size]) |v| {
-                    block.offset = (block.offset << 8) | v;
-                }
-                for (pair[address_size..]) |v| {
-                    block.size = (block.size << 8) | v;
-                }
+            var iter = val;
+            while (iter.next()) |block| {
                 printf("%p ", block.offset);
-                if (prop.size_cells != 0) {
-                    printf("%x ", block.size);
+                if (block.size) |size| {
+                    printf("%x ", size);
                 } else {
                     printf("- ");
                 }
             }
             printf(">");
         },
-        .string => {
-            printf("(string) \"%s\"", prop.value.ptr);
-        },
-        .stringlist => {
+        .string => |val| printf("(string) \"%s\"", val),
+        .stringlist => |list| {
             printf("(stringlist) ");
-            var iter = std.mem.split(u8, prop.value, "\x00");
+            var iter = list;
             var first = true;
             while (iter.next()) |str| {
                 if (first) {
@@ -186,10 +112,10 @@ fn print_property(prop: DtProp) void {
             }
         },
         .empty => printf("(empty)"),
-        .phandle => printf("(handle) %d", be_int(u32, prop.value)),
+        .phandle => |handle| printf("(handle) %d", handle),
         .unknown => {
             printf("(unknown) ");
-            for (prop.value) |val| {
+            for (prop.raw_value) |val| {
                 printf(" %x", @intCast(u32, val));
             }
         },
@@ -245,9 +171,9 @@ const DtNodeIter = struct {
         var props = node.properties;
         while (props.next()) |prop| {
             if (std.mem.eql(u8, "#address-cells", prop.name)) {
-                address_cells = be_int(u32, prop.value);
+                address_cells = prop.value.u32;
             } else if (std.mem.eql(u8, "#size-cells", prop.name)) {
-                size_cells = be_int(u32, prop.value);
+                size_cells = prop.value.u32;
             }
         }
         self.dt_offset = props.dt_offset;
@@ -279,9 +205,69 @@ const DtNodeIter = struct {
 
 const DtProp = struct {
     name: [:0]u8,
-    value: []u8,
+    value: Value,
+    raw_value: []u8,
     address_cells: u32,
     size_cells: u32,
+    const ValueType = enum {
+        // standard types:
+        empty,
+        u32,
+        u64,
+        string,
+        phandle,
+        stringlist,
+        // prop-encoded-arrays:
+        reg,
+        // otherwise
+        unknown,
+    };
+    const Value = union(ValueType) {
+        // standard types:
+        empty,
+        u32: u32,
+        u64: u64,
+        string: [*:0]const u8,
+        phandle: u32,
+        stringlist: std.mem.SplitIterator(u8),
+        // prop-encoded-arrays:
+        reg: Reg,
+        // otherwise
+        unknown,
+    };
+    const Reg = struct {
+        prop_value: []const u8,
+        address_cells: u32,
+        size_cells: u32,
+        pair_n: usize,
+        const Block = struct {
+            offset: u64,
+            size: ?u64,
+        };
+        fn next(self: *Reg) ?Block {
+            const address_size = self.address_cells * 4;
+            const size_size = self.size_cells * 4;
+            const pair_size = address_size + size_size;
+
+            if (self.pair_n >= self.prop_value.len / pair_size) {
+                return null;
+            }
+            const pair = self.prop_value[pair_size * self.pair_n .. pair_size * (self.pair_n + 1)];
+
+            var block: Block = .{ .offset = 0, .size = null };
+            for (pair[0..address_size]) |v| {
+                block.offset = (block.offset << 8) | v;
+            }
+            if (self.size_cells != 0) {
+                block.size = 0;
+                for (pair[address_size..]) |v| {
+                    block.size = (block.size.? << 8) | v;
+                }
+            }
+            self.pair_n += 1;
+            return block;
+        }
+    };
 };
 const DtPropIter = struct {
     dt_offset: usize,
@@ -296,14 +282,76 @@ const DtPropIter = struct {
         self.dt_offset += 4; // length
         const name_offset = FdtHeader.dt_struct(self.dt_offset);
         self.dt_offset += 4; // name_offset
-        var value_raw: [*]u8 = FdtHeader.dt_raw_ptr() + dtb_uint(_dtb.*.off_dt_struct) + self.dt_offset;
+        var raw_value: [*]u8 = FdtHeader.dt_raw_ptr() + dtb_uint(_dtb.*.off_dt_struct) + self.dt_offset;
         self.dt_offset += len; // value
         self.dt_offset = roundup(self.dt_offset);
+
+        const prop_name = std.mem.span(dtb_name(name_offset));
         return DtProp{
-            .name = std.mem.span(dtb_name(name_offset)),
-            .value = value_raw[0..len],
+            .name = prop_name,
+            .value = parseValue(prop_name, raw_value[0..len], self.address_cells, self.size_cells),
+            .raw_value = raw_value[0..len],
             .address_cells = self.address_cells,
             .size_cells = self.size_cells,
         };
+    }
+    fn parseValue(prop_name: [:0]const u8, raw_value: []const u8, address_cells: u32, size_cells: u32) DtProp.Value {
+        const property_type_map = [_]struct { n: []const u8, t: DtProp.ValueType }{
+            .{ .n = "#address-cells", .t = .u32 },
+            .{ .n = "#interrupt-cells", .t = .u32 },
+            .{ .n = "#size-cells", .t = .u32 },
+            // bank-width = ?
+            .{ .n = "bootargs", .t = .string },
+            // bus-range = ?
+            // clock-frequency = or
+            .{ .n = "compatible", .t = .stringlist },
+            .{ .n = "cpu", .t = .phandle },
+            .{ .n = "device_type", .t = .string },
+            // dma-coherent = ?
+            .{ .n = "interrupt-controller", .t = .empty },
+            // interrupt-map = []
+            // 1 interrupt-map-mask = []
+            .{ .n = "interrupt-parent", .t = .phandle },
+            // 10 interrupts = []
+            // 2 interrupts-extended = []
+            // 1 linux,pci-domain = u32?
+            .{ .n = "mmu-type", .t = .string },
+            .{ .n = "model", .t = .string },
+            // offset = u32?
+            .{ .n = "phandle", .t = .phandle },
+            // ranges = []
+            .{ .n = "reg", .t = .reg },
+            // 2 regmap = u32?
+            .{ .n = "riscv,isa", .t = .string },
+            // 1 riscv,ndev = u32?
+            .{ .n = "status", .t = .string },
+            .{ .n = "stdin-path", .t = .string },
+            .{ .n = "stdout-path", .t = .string },
+            // 1 timebase-frequency = or
+            // 2 value = u32?
+        };
+        var property_type: DtProp.ValueType = .unknown;
+        for (property_type_map) |nt| {
+            if (std.mem.eql(u8, nt.n, prop_name)) {
+                property_type = nt.t;
+                break;
+            }
+        }
+
+        switch (property_type) {
+            .u32 => return DtProp.Value{ .u32 = be_int(u32, raw_value) },
+            .u64 => return DtProp.Value{ .u64 = be_int(u64, raw_value) },
+            .reg => return DtProp.Value{ .reg = DtProp.Reg{
+                .prop_value = raw_value,
+                .address_cells = address_cells,
+                .size_cells = size_cells,
+                .pair_n = 0,
+            } },
+            .string => return DtProp.Value{ .string = @ptrCast([*:0]const u8, raw_value.ptr) },
+            .stringlist => return DtProp.Value{ .stringlist = std.mem.split(u8, raw_value, "\x00") },
+            .empty => return .empty,
+            .phandle => return DtProp.Value{ .phandle = be_int(u32, raw_value) },
+            .unknown => return .unknown,
+        }
     }
 };
