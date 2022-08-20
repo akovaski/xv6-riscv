@@ -15,7 +15,7 @@ export fn main(argc: i32, argv: [*][*:0]const u8) i32 {
         i += 1;
     }
 
-    var buf: [512]u8 = undefined;
+    var buf: [512:0]u8 = undefined;
 
     while (true) {
         const last = read_one_line(&buf);

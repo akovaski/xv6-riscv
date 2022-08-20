@@ -52,6 +52,7 @@ pub fn build(b: *std.build.Builder) void {
     build_kernel.setTarget(target);
     build_kernel.code_model = .medium;
     build_kernel.pie = false;
+    build_kernel.use_stage1 = true; // use the Stage1 compiler for now https://github.com/ziglang/zig/issues/12533
     build_kernel.setBuildMode(mode);
 
     const kernel = b.step("kernel/kernel", "Build xv6 kernel AND .asm/.sym files");
@@ -218,12 +219,13 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     build_user_exec.setTarget(target);
     build_user_exec.code_model = .medium;
     build_user_exec.pie = false;
+    build_user_exec.use_stage1 = true; // use the Stage1 compiler for now https://github.com/ziglang/zig/issues/12533 // use the Stage1 compiler for now https://github.com/ziglang/zig/issues/12533
     build_user_exec.setBuildMode(mode);
 
-    const user_exec = b.step("user/" ++ source.name(), "Build xv6 " ++ source.name() ++ " user executable AND .asm,.sym files");
+    const user_exec = b.step("user/" ++ comptime source.name(), "Build xv6 " ++ comptime source.name() ++ " user executable AND .asm,.sym files");
     user_exec.dependOn(&build_user_exec.step);
 
-    const create_syms = createSym(b, build_user_exec, "user/_" ++ source.name());
+    const create_syms = createSym(b, build_user_exec, "user/_" ++ comptime source.name());
     for (create_syms) |create_sym| {
         user_exec.dependOn(&create_sym.step);
     }
