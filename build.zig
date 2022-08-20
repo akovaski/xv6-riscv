@@ -60,7 +60,7 @@ pub fn build(b: *std.build.Builder) void {
     b.default_step = kernel;
 
     {
-        const create_syms = createSym(b, build_kernel, "kernel/kernel");
+        const create_syms = createSym(b, build_kernel);
         for (create_syms) |create_sym| {
             kernel.dependOn(&create_sym.step);
         }
@@ -225,7 +225,7 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     const user_exec = b.step("user/" ++ comptime source.name(), "Build xv6 " ++ comptime source.name() ++ " user executable AND .asm,.sym files");
     user_exec.dependOn(&build_user_exec.step);
 
-    const create_syms = createSym(b, build_user_exec, "user/_" ++ comptime source.name());
+    const create_syms = createSym(b, build_user_exec);
     for (create_syms) |create_sym| {
         user_exec.dependOn(&create_sym.step);
     }
@@ -233,18 +233,20 @@ fn buildUserExec(b: *std.build.Builder, target: std.zig.CrossTarget, mode: std.b
     return build_user_exec;
 }
 
-fn createSym(b: *std.build.Builder, bin: *std.build.LibExeObjStep, comptime exec_path: []const u8) [2]*std.build.RunStep {
+fn createSym(b: *std.build.Builder, bin: *std.build.LibExeObjStep) [2]*std.build.RunStep {
     const run_create_asm = b.addSystemCommand(&[_][]const u8{
         "sh",
         "-c",
-        "llvm-objdump -S " ++ exec_path ++ " > " ++ exec_path ++ ".asm",
+        "llvm-objdump -S \"$0\" > \"$0.asm\"",
     });
+    run_create_asm.addArtifactArg(bin);
     run_create_asm.step.dependOn(&bin.step);
     const run_create_sym = b.addSystemCommand(&[_][]const u8{
         "sh",
         "-c",
-        "llvm-objdump -t " ++ exec_path ++ " | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > " ++ exec_path ++ ".sym",
+        "llvm-objdump -t \"$0\" | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > \"$0.sym\"",
     });
+    run_create_sym.addArtifactArg(bin);
     run_create_sym.step.dependOn(&bin.step);
 
     return [_]*std.build.RunStep{ run_create_asm, run_create_sym };
