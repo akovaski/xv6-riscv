@@ -17,7 +17,7 @@ main()
     printf("\n");
     printf("xv6 kernel is booting\n");
     printf("\n");
-    // walk_device_tree();
+    walk_device_tree();
     kinit();         // physical page allocator
     kvminit();       // create kernel page table
     kvminithart();   // turn on paging

@@ -1,5 +1,5 @@
 const std = @import("std");
-extern fn printf([*:0]const u8, ...) void;
+const kernel = @import("kernel.zig");
 
 // _dtb stores the address of the device tree
 export var _dtb: *FdtHeader = undefined;
@@ -35,83 +35,39 @@ fn dtb_uint(x: u32) u32 {
 fn print_level_indent(level: u32) void {
     var i: u32 = 0;
     while (i < level) : (i += 1) {
-        printf("  ");
+        kernel.debug.print("  ", .{});
     }
 }
 
 export fn walk_device_tree() void {
-    printf("_dtb: %p\n", _dtb);
-    printf("magic: %p\n", dtb_uint(_dtb.magic));
-    printf("struct: %p\n", dtb_uint(_dtb.off_dt_struct));
+    std.log.info("_dtb: {*}", .{_dtb});
+    std.log.info("magic: {x}", .{dtb_uint(_dtb.magic)});
+    std.log.info("struct: {x}", .{dtb_uint(_dtb.off_dt_struct)});
     walk_device_tree_iter(0, DtNodeIter.root());
 
-    printf("memory:\n");
+    std.log.info("Quering device tree for memory...", .{});
     if (DtNodeIter.root().find("/memory@80000000")) |node| {
-        printf("Found\n");
+        std.log.info("Memory found", .{});
         var props = node.properties;
         while (props.next()) |prop| {
-            print_property(prop);
+            kernel.debug.print("{}\n", .{prop});
         }
     } else {
-        printf("Not found\n");
+        std.log.info("Memory not found", .{});
     }
 }
 fn walk_device_tree_iter(level: u32, iter_arg: DtNodeIter) void {
     var iter = iter_arg;
     while (iter.next()) |node| {
         print_level_indent(level);
-        printf("Node: %s\n", node.name.ptr);
+        kernel.debug.print("Node: {s}\n", .{node.name.ptr});
         var props = node.properties;
         while (props.next()) |prop| {
             print_level_indent(level + 1);
-            print_property(prop);
+            kernel.debug.print("{}\n", .{prop});
         }
         walk_device_tree_iter(level + 1, node.children);
     }
-}
-fn print_property(prop: DtProp) void {
-    printf(".%s: ", prop.name.ptr);
-    switch (prop.value) {
-        .u32 => |val| printf("(u32) %d", val),
-        .u64 => |val| printf("(u64) %d", val),
-        .reg => |val| {
-            printf("(reg %d,%d) ", val.address_cells, val.size_cells);
-            printf("< ");
-            var iter = val;
-            while (iter.next()) |block| {
-                printf("%p ", block.offset);
-                if (block.size) |size| {
-                    printf("%x ", size);
-                } else {
-                    printf("- ");
-                }
-            }
-            printf(">");
-        },
-        .string => |val| printf("(string) \"%s\"", val),
-        .stringlist => |list| {
-            printf("(stringlist) ");
-            var iter = list;
-            var first = true;
-            while (iter.next()) |str| {
-                if (first) {
-                    first = false;
-                } else {
-                    printf(", ");
-                }
-                printf("\"%s\"", str.ptr);
-            }
-        },
-        .empty => printf("(empty)"),
-        .phandle => |handle| printf("(handle) %d", handle),
-        .unknown => {
-            printf("(unknown) ");
-            for (prop.raw_value) |val| {
-                printf(" %x", @intCast(u32, val));
-            }
-        },
-    }
-    printf("\n");
 }
 export fn main_memory_size() u64 {
     var mem_node = DtNodeIter.root().find("/memory@80000000").?;
@@ -213,7 +169,6 @@ const DtNodeIter = struct {
 const DtProp = struct {
     name: [:0]const u8,
     value: Value,
-    raw_value: []const u8,
     address_cells: u32,
     size_cells: u32,
     const ValueType = enum {
@@ -240,7 +195,56 @@ const DtProp = struct {
         // prop-encoded-arrays:
         reg: Reg,
         // otherwise
-        unknown,
+        unknown: []const u8,
+        pub fn format(
+            self: Value,
+            comptime fmt: []const u8,
+            options: std.fmt.FormatOptions,
+            writer: anytype,
+        ) !void {
+            _ = fmt;
+            _ = options;
+            switch (self) {
+                .u32 => |val| try writer.print("(u32) {}", .{val}),
+                .u64 => |val| try writer.print("(u64) {}", .{val}),
+                .reg => |val| {
+                    try writer.print("(reg {},{}) ", .{ val.address_cells, val.size_cells });
+                    try writer.writeAll("< ");
+                    var iter = val;
+                    while (iter.next()) |block| {
+                        try writer.print("{x} ", .{block.offset});
+                        if (block.size) |size| {
+                            try writer.print("{x} ", .{size});
+                        } else {
+                            try writer.writeAll("- ");
+                        }
+                    }
+                    try writer.writeAll(">");
+                },
+                .string => |val| try writer.print("(string) \"{s}\"", .{val}),
+                .stringlist => |list| {
+                    try writer.writeAll("(stringlist) ");
+                    var iter = list;
+                    var first = true;
+                    while (iter.next()) |str| {
+                        if (first) {
+                            first = false;
+                        } else {
+                            try writer.writeAll(", ");
+                        }
+                        try writer.print("\"{s}\"", .{str});
+                    }
+                },
+                .empty => try writer.writeAll("(empty)"),
+                .phandle => |handle| try writer.print("(handle) {}", .{handle}),
+                .unknown => |raw_value| {
+                    try writer.writeAll("(unknown) ");
+                    for (raw_value) |val| {
+                        try writer.print(" {x}", .{@intCast(u32, val)});
+                    }
+                },
+            }
+        }
     };
     const Reg = struct {
         prop_value: []const u8,
@@ -275,6 +279,16 @@ const DtProp = struct {
             return block;
         }
     };
+    pub fn format(
+        self: DtProp,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        try writer.print(".{s}: {}", .{ self.name, self.value });
+    }
 };
 const DtPropIter = struct {
     dt_offset: usize,
@@ -297,7 +311,6 @@ const DtPropIter = struct {
         return DtProp{
             .name = prop_name,
             .value = parseValue(prop_name, raw_value[0..len], self.address_cells, self.size_cells),
-            .raw_value = raw_value[0..len],
             .address_cells = self.address_cells,
             .size_cells = self.size_cells,
         };
@@ -358,7 +371,7 @@ const DtPropIter = struct {
             .stringlist => return DtProp.Value{ .stringlist = std.mem.split(u8, raw_value, "\x00") },
             .empty => return .empty,
             .phandle => return DtProp.Value{ .phandle = be_int(u32, raw_value) },
-            .unknown => return .unknown,
+            .unknown => return .{ .unknown = raw_value },
         }
     }
 };
